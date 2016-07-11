@@ -277,7 +277,6 @@ rtRemoteNameService::runListener()
 
   while (true)
   {
-    rtLogInfo("listening");
     int maxFd = 0;
 
     fd_set read_fds;
