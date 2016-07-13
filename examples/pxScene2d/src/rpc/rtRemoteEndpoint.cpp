@@ -1,18 +1,26 @@
-class rtRemoteEndpoint
-{
-public:
-  virtual rtRemoteEndpoint(std::string const& uri);
-  virtual ~rtRemoteEndpoint();
-  rtError GetUri(std::string* uri) const;
-  rtError GetScheme(std::string* scheme) const;
-  rtError GetFd(int* fd) const;
-  virtual rtError Open(int* fd);
+#include "rtRemoteEndpoint.h"
+#include "rtSocketUtils.h"
+#include "rtRemoteMessage.h"
+#include "rtRemoteConfig.h"
 
-protected:
-  std::string m_uri;
-  std::string m_scheme;
-  int m_fd;
-};
+#include <condition_variable>
+#include <thread>
+#include <mutex>
+
+#include <rtLog.h>
+
+#include <errno.h>
+#include <fcntl.h>
+#include <string.h>
+#include <netinet/in.h>
+#include <net/if.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <ifaddrs.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 rtRemoteEndpoint::rtRemoteEndpoint(std::string const& uri)
 : m_uri(uri)
@@ -62,21 +70,9 @@ rtRemoteEndpoint::Open(int* fd)
 }
 
 
+///////////////////////////////
+///////////////////////////////
 
-
-class rtRemoteUnixEndpoint : public virtual rtRemoteEndpoint
-{
-public:
-  virtual rtRemoteUnixEndpoint(std::string const& uri);
-  virtual ~rtRemoteUnixEndpoint();
-  
-  virtual rtError Open(int* fd) override;
-  
-  rtError GetPath(std::string* path) const;
-
-protected:
-  std::string m_path; 
-};
 
 rtRemoteUnixEndpoint::rtRemoteUnixEndpoint(std::string const& uri)
 : rtRemoteEndpoint(uri)
@@ -104,20 +100,8 @@ rtRemoteUnixEndpoint::GetPath(std::string* path) const
   return RT_OK;   
 }
 
-
-class rtRemoteInetEndpoint : public virtual rtRemoteEndpoint
-{
-public:
-  virtual rtRemoteInetEndpoint(std::string const& uri);
-  virtual ~rtRemoteInetEndpoint();
-  
-  virtual rtError Open(int* fd) override;
-  
-  rtError GetPath(std::string* path) const;
-
-protected:
-  std::string m_path; 
-};
+///////////////////////////////
+///////////////////////////////
 
 rtRemoteInetEndpoint::rtRemoteInetEndpoint(std::string const& uri)
 : rtRemoteEndpoint(uri)
@@ -152,6 +136,23 @@ rtRemoteInetEndpoint::Open(int* fd)
   }
   *fd = m_fd;
   return RT_OK; // should be implemented by subclass
+}
+
+rtError
+rtRemoteInetEndpoint::Connect()
+{
+  socklen_t len;
+  rtSocketGetLength(m_sockaddr, &len);
+
+  int ret = ::connect(m_fd, reinterpret_cast<sockaddr const *>(&m_sockaddr), len);
+  if (ret < 0)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogError("failed to connect to remote rpc endpoint. %s", rtStrError(e));
+    return e;
+  }
+
+  return RT_OK;
 }
 
 rtError
