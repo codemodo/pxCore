@@ -54,5 +54,7 @@ public:
   rtError GetPath(std::string* path) const;
 
 protected:
-  std::string m_path; 
+  std::string m_addr;
+  int m_port;
+  sockaddr_storage m_ep; 
 };

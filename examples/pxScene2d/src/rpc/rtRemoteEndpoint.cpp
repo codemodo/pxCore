@@ -109,8 +109,9 @@ rtRemoteInetEndpoint::rtRemoteInetEndpoint(std::string const& uri)
 , m_port(-1)
 {
     // plus pull out the addr and port
-    m_addr = ""; //tmp faking it
-    m_port = 1000;
+    m_addr = "127.0.0.1"; //tmp faking it
+    m_port = 49118;
+    err = rtParseAddress(m_ep, m_addr.c_str(), m_port, nullptr);
 }
 
 rtRemoteInetEndpoint::~rtRemoteInetEndpoint() { }

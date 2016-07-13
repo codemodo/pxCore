@@ -8,6 +8,7 @@
 #include "rtValueWriter.h"
 #include "rtRemoteConfig.h"
 #include "rtRemoteFactory.h"
+#include "rtRemoteEndpoint.h"
 
 #include <sstream>
 #include <set>
@@ -420,11 +421,17 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
     rtLogDebug("object %s found at endpoint: %s", name.c_str(),
       rtSocketToString(rpc_endpoint).c_str());
 
+    //TODOfiuk expand endpoint through resolvers
+
+
     if (err == RT_OK)
     {
       std::shared_ptr<rtRemoteClient> client;
       std::string const endpointName = rtSocketToString(rpc_endpoint);
-
+      
+      
+      rtRemoteInetEndpoint tmp_endpoint("tcp://127.0.0.1:49118");
+      
       std::unique_lock<std::mutex> lock(m_mutex);
       auto itr = m_object_map.find(endpointName);
       if (itr != m_object_map.end())
@@ -444,7 +451,8 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
 
       if (!client)
       {
-        client.reset(new rtRemoteClient(m_env, rpc_endpoint));
+        //TODOfiuk
+        client.reset(new rtRemoteClient(m_env, tmp_endpoint));
         client->setMessageCallback(std::bind(&rtRemoteServer::onIncomingMessage, this, 
               std::placeholders::_1, std::placeholders::_2));
         err = client->open();
