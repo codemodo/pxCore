@@ -3,6 +3,7 @@
 
 #include "rtRemoteTypes.h"
 #include "rtSocketUtils.h"
+#include "rtRemoteEndpoint.h"
 
 #include <condition_variable>
 #include <deque>
@@ -15,6 +16,7 @@ class rtRemoteClient;
 class rtRemoteMessage;
 class rtRemoteRequest;
 class rtRemoteStreamSelector;
+class rtRemoteEndpoint;
 
 class rtRemoteStream : public std::enable_shared_from_this<rtRemoteStream>
 {

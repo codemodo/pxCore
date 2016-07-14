@@ -14,8 +14,8 @@
 class rtRemoteEndpoint
 {
 public:
-  virtual rtRemoteEndpoint(std::string const& uri);
-  virtual ~rtRemoteEndpoint();
+  rtRemoteEndpoint(std::string const& uri);
+  ~rtRemoteEndpoint();
   rtError GetUri(std::string* uri) const;
   rtError GetScheme(std::string* scheme) const;
   rtError GetFd(int* fd) const;
@@ -31,8 +31,8 @@ protected:
 class rtRemoteUnixEndpoint : public virtual rtRemoteEndpoint
 {
 public:
-  virtual rtRemoteUnixEndpoint(std::string const& uri);
-  virtual ~rtRemoteUnixEndpoint();
+  rtRemoteUnixEndpoint(std::string const& uri);
+  ~rtRemoteUnixEndpoint();
   
   virtual rtError Open(int* fd) override;
   
@@ -46,8 +46,8 @@ protected:
 class rtRemoteInetEndpoint : public virtual rtRemoteEndpoint
 {
 public:
-  virtual rtRemoteInetEndpoint(std::string const& uri);
-  virtual ~rtRemoteInetEndpoint();
+  rtRemoteInetEndpoint(std::string const& uri);
+  ~rtRemoteInetEndpoint();
   
   virtual rtError Open(int* fd) override;
   

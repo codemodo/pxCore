@@ -20,12 +20,11 @@
 #include "rtRemoteTypes.h"
 #include "rtRemoteMessage.h"
 #include "rtSocketUtils.h"
-#include "rtRemoteEndpoint.h"
 
 class rtRemoteClient: public std::enable_shared_from_this<rtRemoteClient>
 {
 public:
-  rtRemoteClient(rtRemoteEnvironment* env, int fd, sockaddr_storage const& local_endpoint,
+  rtRemoteClient(rtRemoteEnvironment* env, int fd, rtRemoteEndpoint const& local_endpoint,
     rtRemoteEndpoint const& remote_endpoint);
   rtRemoteClient(rtRemoteEnvironment* env, rtRemoteEndpoint const& remote_endpoint);
   ~rtRemoteClient();
@@ -55,7 +54,7 @@ public:
     return m_stream->sendDocument(doc);
   }
 
-  inline sockaddr_storage getRemoteEndpoint() const
+  inline rtRemoteEndpoint getRemoteEndpoint() const
     { return m_stream->getRemoteEndpoint(); }
 
   inline sockaddr_storage getLocalEndpoint() const
