@@ -173,8 +173,8 @@ rtRemoteServer::rtRemoteServer(rtRemoteEnvironment* env)
   , m_resolver(nullptr)
   , m_keep_alive_interval(15)
   , m_env(env)
-  , m_rpc_endpoint(nullptr)
 {
+  memset(&m_rpc_endpoint, 0, sizeof(m_rpc_endpoint));
 
   m_shutdown_pipe[0] = -1;
   m_shutdown_pipe[1] = -1;
@@ -342,14 +342,14 @@ rtRemoteServer::doAccept(int fd)
   rtLogInfo("new connection from %s with fd:%d", rtSocketToString(remote_sockaddr).c_str(), ret);
 
   std::string remote_uri = rtSocketToString(remote_sockaddr);
-  rtRemoteEndpoint remote_endpoint(remote_uri);
+  rtEndpointAddr remote_endpoint(remote_uri);
 
   sockaddr_storage local_sockaddr;
   memset(&local_endpoint, 0, sizeof(sockaddr_storage));
   rtGetSockName(fd, local_sockaddr);
 
   std::string local_uri = rtSocketToString(local_sockaddr);
-  rtRemoteEndpoint local_endpoint(local_uri);
+  rtEndpointAddr local_endpoint(local_uri);
   //TODOfiuk all of these types of instantiations need to be changed to rtCreateEndpoint
 
   std::shared_ptr<rtRemoteClient> newClient(new rtRemoteClient(m_env, ret, local_endpoint, remote_endpoint));
@@ -524,8 +524,9 @@ rtRemoteServer::openRpcListener()
 
   // new
   std::string uri = rtSocketToString(tmp_endpoint);
-  m_rpc_endpoint(uri);
-  err = m_rpc_endpoint->init(m_listen_fd);
+  m_rpc_endpoint = rtRemoteEndpointCreate(m_env, uri);
+  rtRemoteIResource* rpc_server = rtRemoteResourceCreate(m_rpc_endpoint);
+  err = rpc_server->init(m_listen_fd);
 
   if (err != RT_OK)
     return err;

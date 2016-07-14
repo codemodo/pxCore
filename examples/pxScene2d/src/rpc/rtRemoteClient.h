@@ -24,9 +24,9 @@
 class rtRemoteClient: public std::enable_shared_from_this<rtRemoteClient>
 {
 public:
-  rtRemoteClient(rtRemoteEnvironment* env, int fd, rtRemoteEndpoint const& local_endpoint,
-    rtRemoteEndpoint const& remote_endpoint);
-  rtRemoteClient(rtRemoteEnvironment* env, rtRemoteEndpoint const& remote_endpoint);
+  rtRemoteClient(rtRemoteEnvironment* env, int fd, rtEndpointAddr const& local_endpoint,
+    rtEndpointAddr const& remote_endpoint);
+  rtRemoteClient(rtRemoteEnvironment* env, rtEndpointAddr const& remote_endpoint);
   ~rtRemoteClient();
 
   rtError open();
@@ -54,10 +54,10 @@ public:
     return m_stream->sendDocument(doc);
   }
 
-  inline rtRemoteEndpoint getRemoteEndpoint() const
+  inline rtEndpointAddr getRemoteEndpoint() const
     { return m_stream->getRemoteEndpoint(); }
 
-  inline sockaddr_storage getLocalEndpoint() const
+  inline rtEndpointAddr getLocalEndpoint() const
     { return m_stream->getLocalEndpoint(); }
 
 private:

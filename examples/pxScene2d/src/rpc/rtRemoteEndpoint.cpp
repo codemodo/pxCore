@@ -22,7 +22,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-rtRemoteEndpoint::rtRemoteEndpoint(std::string const& uri)
+rtRemoteIResource::rtRemoteIResource(rtEndpointAddr const& ep_addr)
 : m_uri(uri)
 , m_scheme(nullptr)
 , m_fd(-1)
@@ -31,82 +31,24 @@ rtRemoteEndpoint::rtRemoteEndpoint(std::string const& uri)
   m_scheme = "tcp"; // temp faking it
 }
 
-rtRemoteEndpoint::~rtRemoteEndpoint() { }
-
-rtError
-rtRemoteEndpoint::GetUri(std::string* uri) const
-{
-  if (m_uri == nullptr)
-    return RT_FAIL;
-
-  *uri = m_uri;
-  return RT_OK;
-}
-
-rtError
-rtRemoteEndpoint::GetScheme(std::string* scheme) const
-{
-  if (m_scheme == nullptr)
-    return RT_FAIL;
-
-  *scheme = m_scheme;
-  return RT_OK;
-}
-
-rtError
-rtRemoteEndpoint::GetFd(int* fd) const
-{
-  if (m_fd == -1)
-    return RT_FAIL;
-
-  *fd = m_fd;
-  return RT_OK;
-}
-
-rtError
-rtRemoteEndpoint::Open(int* fd)
-{
-  return RT_FAIL; //should be implemented in subclass
-}
+rtRemoteIResource::~rtRemoteIResource() { }
 
 
 ///////////////////////////////
 ///////////////////////////////
 
 
-rtRemoteUnixEndpoint::rtRemoteUnixEndpoint(std::string const& uri)
-: rtRemoteEndpoint(uri)
-, m_path(nullptr)
-{
-    // plus pull out the path
-    m_path = ""; //tmp faking it
-}
+rtRemoteILocalResource::rtRemoteILocalResource(rtEndpointAddr const& ep_addr)
+: rtRemoteIResource(ep_addr)
+{ }
 
-rtRemoteUnixEndpoint::~rtRemoteUnixEndpoint() { }
-
-rtError
-rtRemoteUnixEndpoint::Open(int* fd)
-{
-  return RT_FAIL; // should be implemented by subclass
-}
-
-rtError
-rtRemoteUnixEndpoint::GetPath(std::string* path) const
-{
-  if (m_path == nullptr)
-    return RT_FAIL;
-
-  *path = m_path;
-  return RT_OK;   
-}
+rtRemoteILocalResource::~rtRemoteILocalResource() { }
 
 ///////////////////////////////
 ///////////////////////////////
 
-rtRemoteInetEndpoint::rtRemoteInetEndpoint(std::string const& uri)
-: rtRemoteEndpoint(uri)
-, m_addr(nullptr)
-, m_port(-1)
+rtRemoteINetworkResource::rtRemoteINetworkResource(rtEndpointAddr const& ep_addr)
+: rtRemoteIResource(ep_addr)
 {
     // plus pull out the addr and port
     m_addr = "127.0.0.1"; //tmp faking it
@@ -114,21 +56,11 @@ rtRemoteInetEndpoint::rtRemoteInetEndpoint(std::string const& uri)
     err = rtParseAddress(m_ep, m_addr.c_str(), m_port, nullptr);
 }
 
-rtRemoteInetEndpoint::rtRemoteInetEndpoint(int const& fd)
-: m_fd(fd)
-, m_addr(nullptr)
-, m_port(-1)
-{
-    // plus pull out the addr and port
-    m_addr = "127.0.0.1"; //tmp faking it
-    m_port = 49118;
-    err = rtParseAddress(m_ep, m_addr.c_str(), m_port, nullptr);
-}
+rtRemoteINetworkResource::~rtRemoteINetworkResource() { }
 
-rtRemoteInetEndpoint::~rtRemoteInetEndpoint() { }
-
+//TODOfiuk this stuff needs to move out into server/client subclasses
 rtError
-rtRemoteInetEndpoint::init(int* fd)
+rtRemoteINetworkResource::open(int* fd)
 {
   // create socket
   rtError err = RT_OK;
@@ -171,7 +103,7 @@ rtRemoteInetEndpoint::init(int* fd)
     rtLogError("fcntl: %s", rtStrError(e));
     return e;
   }
-  
+
   // start listen mode
   ret = listen(m_fd, 2);
   if (ret < 0)
@@ -201,24 +133,4 @@ rtRemoteInetEndpoint::Connect()
   }
 
   return RT_OK;
-}
-
-rtError
-rtRemoteInetEndpoint::GetAddr(std::string* addr) const
-{
-  if (m_addr == nullptr)
-    return RT_FAIL;
-
-  *addr = m_addr;
-  return RT_OK;   
-}
-
-rtError
-rtRemoteInetEndpoint::GetPort(int* port) const
-{
-  if (m_port == nullptr)
-    return RT_FAIL;
-
-  *port = m_port;
-  return RT_OK;   
 }

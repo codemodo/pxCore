@@ -131,7 +131,7 @@ rtRemoteStreamSelector::pollFds()
   return RT_OK;
 }
 
-rtRemoteStream::rtRemoteStream(rtRemoteEnvPtr env, int fd, sockaddr_storage const& local_endpoint, rtRemoteEndpoint const& remote_endpoint)
+rtRemoteStream::rtRemoteStream(rtRemoteEnvPtr env, int fd, rtEndpointAddr const& local_endpoint, rtEndpointAddr const& remote_endpoint)
   : m_fd(fd)
   , m_last_message_time(0)
   , m_last_ka_message_time(0)
@@ -242,7 +242,7 @@ rtRemoteStream::connect()
 }
 
 rtError
-rtRemoteStream::connectTo(rtRemoteEndpoint const& endpoint)
+rtRemoteStream::connectTo(rtEndpointAddr const& endpoint)
 {
   const type_info& epType = typeid(endpoint);
 
@@ -412,4 +412,5 @@ rtRemoteStream::waitForResponse(int key, uint32_t timeout)
     });
   lock.unlock();
   return res;
+}
 }

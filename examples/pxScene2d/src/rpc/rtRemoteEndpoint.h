@@ -11,50 +11,58 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-class rtRemoteEndpoint
+rtEndpointAddr const& rtRemoteEndpointCreate(rtRemoteEnvPtr env, std::string s)
+{
+
+}
+
+struct rtEndpointAddr
+{
+  std::string uri;
+  std::string scheme;
+};
+
+struct rtEndpointAddrUnix : rtEndpointAddr
+{
+  std::string path;
+};
+
+struct rtEndpoingAddrInet : rtEndpointAddr
+{
+  std::string ip;
+  int port;
+};
+
+class rtRemoteIResource
 {
 public:
-  rtRemoteEndpoint(std::string const& uri);
-  ~rtRemoteEndpoint();
-  rtError GetUri(std::string* uri) const;
-  rtError GetScheme(std::string* scheme) const;
-  rtError GetFd(int* fd) const;
-  virtual rtError Open(int* fd);
+  rtRemoteIResource(rtEndpointAddr const& ep_addr);
+  ~rtRemoteIResource();
+
+  virtual rtError Open(int* fd) = 0;
+  
+  inline rtEndpointAddr GetEndpointAddr() const
+    { return m_endpoint_addr; }
+  
+  inline int GetFd() const
+    { return m_fd; }
 
 protected:
-  std::string m_uri;
-  std::string m_scheme;
+  rtEndpointAddr m_endpoint_addr;
   int m_fd;
 };
 
-
-class rtRemoteUnixEndpoint : public virtual rtRemoteEndpoint
+class rtRemoteILocalResource : public virtual rtRemoteIResource
 {
 public:
-  rtRemoteUnixEndpoint(std::string const& uri);
-  ~rtRemoteUnixEndpoint();
-  
-  virtual rtError Open(int* fd) override;
-  
-  rtError GetPath(std::string* path) const;
-
-protected:
-  std::string m_path; 
+  rtRemoteILocalResource(rtEndpointAddr const& ep_addr);
+  ~rtRemoteILocalResource();
 };
 
 
-class rtRemoteInetEndpoint : public virtual rtRemoteEndpoint
+class rtRemoteINetworkResource : public virtual rtRemoteIResource
 {
 public:
-  rtRemoteInetEndpoint(std::string const& uri);
-  ~rtRemoteInetEndpoint();
-  
-  virtual rtError Open(int* fd) override;
-  
-  rtError GetPath(std::string* path) const;
-
-protected:
-  std::string m_addr;
-  int m_port;
-  sockaddr_storage m_ep; 
+  rtRemoteINetworkResource(rtEndpointAddr const& ep_addr);
+  ~rtRemoteINetworkResource();
 };

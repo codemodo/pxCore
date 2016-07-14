@@ -66,7 +66,7 @@ private:
   using CommandHandlerMap = std::map< std::string, rtRemoteMessageHandler >;
   using ObjectRefeMap = std::map< std::string, ObjectReference >;
 
-  rtRemoteEndpoint*             m_rpc_endpoint;
+  rtEndpointAddr                m_rpc_endpoint;
   int                           m_listen_fd;
   //TODOaf merge these two into Endpoint
 
