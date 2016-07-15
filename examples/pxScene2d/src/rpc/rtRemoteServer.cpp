@@ -329,28 +329,23 @@ rtRemoteServer::runListener()
 void
 rtRemoteServer::doAccept(int fd)
 {
-  sockaddr_storage remote_sockaddr;
-  memset(&remote_sockaddr, 0, sizeof(sockaddr_storage));
+  sockaddr_storage remote_endpoint;
+  memset(&remote_endpoint, 0, sizeof(remote_endpoint));
+
   socklen_t len = sizeof(sockaddr_storage);
-  int ret = accept(fd, reinterpret_cast<sockaddr *>(&remote_sockaddr), &len);
+
+  int ret = accept(fd, reinterpret_cast<sockaddr *>(&remote_endpoint), &len);
   if (ret == -1)
   {
     rtError e = rtErrorFromErrno(errno);
     rtLogWarn("error accepting new tcp connect. %s", rtStrError(e));
     return;
   }
-  rtLogInfo("new connection from %s with fd:%d", rtSocketToString(remote_sockaddr).c_str(), ret);
+  rtLogInfo("new connection from %s with fd:%d", rtSocketToString(remote_endpoint).c_str(), ret);
 
-  std::string remote_uri = rtSocketToString(remote_sockaddr);
-  rtEndpointAddr remote_endpoint(remote_uri);
-
-  sockaddr_storage local_sockaddr;
+  sockaddr_storage local_endpoint;
   memset(&local_endpoint, 0, sizeof(sockaddr_storage));
-  rtGetSockName(fd, local_sockaddr);
-
-  std::string local_uri = rtSocketToString(local_sockaddr);
-  rtEndpointAddr local_endpoint(local_uri);
-  //TODOfiuk all of these types of instantiations need to be changed to rtCreateEndpoint
+  rtGetSockName(fd, local_endpoint);
 
   std::shared_ptr<rtRemoteClient> newClient(new rtRemoteClient(m_env, ret, local_endpoint, remote_endpoint));
   newClient->setMessageCallback(std::bind(&rtRemoteServer::onIncomingMessage, this, std::placeholders::_1, std::placeholders::_2));
@@ -425,17 +420,11 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
     rtLogDebug("object %s found at endpoint: %s", name.c_str(),
       rtSocketToString(rpc_endpoint).c_str());
 
-    //TODOfiuk expand endpoint through resolvers
-
-
     if (err == RT_OK)
     {
       std::shared_ptr<rtRemoteClient> client;
       std::string const endpointName = rtSocketToString(rpc_endpoint);
-      
-      
-      rtRemoteInetEndpoint tmp_endpoint("tcp://127.0.0.1:49118");
-      
+
       std::unique_lock<std::mutex> lock(m_mutex);
       auto itr = m_object_map.find(endpointName);
       if (itr != m_object_map.end())
@@ -455,8 +444,7 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
 
       if (!client)
       {
-        //TODOfiuk
-        client.reset(new rtRemoteClient(m_env, tmp_endpoint));
+        client.reset(new rtRemoteClient(m_env, rpc_endpoint));
         client->setMessageCallback(std::bind(&rtRemoteServer::onIncomingMessage, this, 
               std::placeholders::_1, std::placeholders::_2));
         err = client->open();
@@ -489,17 +477,12 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
 rtError
 rtRemoteServer::openRpcListener()
 {
-  rtError err = RT_OK;
   int ret = 0;
   char path[UNIX_PATH_MAX];
-  sockaddr_storage tmp_endpoint;
 
   memset(path, 0, sizeof(path));
   cleanup_stale_unix_sockets();
-  
-  //TODOfiuk Very circular right now.  We're creating sockaddrs with info pulled from config, to then
-  //pull that info out using rtSocketToString, which eventually gets turned back into a sockaddr by rtRemoteEndpoint.
-  //Is the right approach here to just build the uri from the stuff in the config directly?
+
   if (is_unix_domain(m_env))
   {
     rtError e = rtCreateUnixSocketName(0, path, sizeof(path));
@@ -513,34 +496,62 @@ rtRemoteServer::openRpcListener()
       rtLogInfo("error trying to remove %s. %s", path, rtStrError(e));
     }
 
-    struct sockaddr_un *un_addr = reinterpret_cast<sockaddr_un*>(&tmp_endpoint);
+    struct sockaddr_un *un_addr = reinterpret_cast<sockaddr_un*>(&m_rpc_endpoint);
     un_addr->sun_family = AF_UNIX;
     strncpy(un_addr->sun_path, path, UNIX_PATH_MAX);
   }
   else
   {
-    rtGetDefaultInterface(tmp_endpoint, 0);
+    rtGetDefaultInterface(m_rpc_endpoint, 0);
   }
 
-  // new
-  std::string uri = rtSocketToString(tmp_endpoint);
-  m_rpc_endpoint = rtRemoteEndpointCreate(m_env, uri);
-  rtRemoteIResource* rpc_server = rtRemoteResourceCreate(m_rpc_endpoint);
-  err = rpc_server->init(m_listen_fd);
-
-  if (err != RT_OK)
-    return err;
+  m_listen_fd = socket(m_rpc_endpoint.ss_family, SOCK_STREAM, 0);
+  if (m_listen_fd < 0)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogError("failed to create socket. %s", rtStrError(e));
+    return e;
+  }
 
   fcntl(m_listen_fd, F_SETFD, fcntl(m_listen_fd, F_GETFD) | FD_CLOEXEC);
 
-  if (typeid(m_rpc_endpoint) != typeid(rtRemoteUnixEndpoint)) // new
-  // if (m_rpc_endpoint.ss_family != AF_UNIX)                 // old
+  if (m_rpc_endpoint.ss_family != AF_UNIX)
   {
     uint32_t one = 1;
     if (-1 == setsockopt(m_listen_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
       rtLogError("setting TCP_NODELAY failed");
   }
-  
+
+  socklen_t len;
+  rtSocketGetLength(m_rpc_endpoint, &len);
+
+  ret = ::bind(m_listen_fd, reinterpret_cast<sockaddr *>(&m_rpc_endpoint), len);
+  if (ret < 0)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogError("failed to bind socket. %s", rtStrError(e));
+    return e;
+  }
+
+  rtGetSockName(m_listen_fd, m_rpc_endpoint);
+  rtLogInfo("local rpc listener on: %s", rtSocketToString(m_rpc_endpoint).c_str());
+
+  ret = fcntl(m_listen_fd, F_SETFL, O_NONBLOCK);
+  if (ret < 0)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogError("fcntl: %s", rtStrError(e));
+    return e;
+  }
+
+  ret = listen(m_listen_fd, 2);
+  if (ret < 0)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogError("failed to put socket in listen mode. %s", rtStrError(e));
+    return e;
+  }
+
   return RT_OK;
 }
 

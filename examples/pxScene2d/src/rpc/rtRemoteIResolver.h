@@ -13,10 +13,10 @@ class rtRemoteIResolver
 {
 public:
   virtual ~rtRemoteIResolver() { }
-  virtual rtError open(rtEndpointAddr const& rpc_endpoint) = 0;
+  virtual rtError open(sockaddr_storage const& rpc_endpoint) = 0;
   virtual rtError close() = 0;
-  virtual rtError registerObject(std::string const& name, rtEndpointAddr const& endpoint) = 0;
-  virtual rtError locateObject(std::string const& name, rtEndpointAddr endpoint, uint32_t timeout) = 0;
+  virtual rtError registerObject(std::string const& name, sockaddr_storage const& endpoint) = 0;
+  virtual rtError locateObject(std::string const& name, sockaddr_storage& endpoint, uint32_t timeout) = 0;
 };
 
 #endif

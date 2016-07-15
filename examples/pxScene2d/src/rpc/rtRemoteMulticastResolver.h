@@ -21,29 +21,29 @@ public:
   ~rtRemoteMulticastResolver();
 
 public:
-  virtual rtError open(rtEndpointAddr const& rpc_endpoint) override;
+  virtual rtError open(sockaddr_storage const& rpc_endpoint) override;
   virtual rtError close() override;
-  virtual rtError registerObject(std::string const& name, rtEndpointAddr const& endpoint) override;
-  virtual rtError locateObject(std::string const& name, rtEndpointAddr& endpoint,
+  virtual rtError registerObject(std::string const& name, sockaddr_storage const& endpoint) override;
+  virtual rtError locateObject(std::string const& name, sockaddr_storage& endpoint,
     uint32_t timeout) override;
 
 private:
-  using CommandHandler = rtError (rtRemoteMulticastResolver::*)(rtJsonDocPtr const&, rtEndpointAddr const&);
+  using CommandHandler = rtError (rtRemoteMulticastResolver::*)(rtJsonDocPtr const&, sockaddr_storage const&);
   using HostedObjectsMap = std::map< std::string, sockaddr_storage >;
   using CommandHandlerMap = std::map< std::string, CommandHandler >;
   using RequestMap = std::map< rtCorrelationKey, rtJsonDocPtr >;
 
   void runListener();
   void doRead(int fd, rtSocketBuffer& buff);
-  void doDispatch(char const* buff, int n, rtEndpointAddr* peer);
+  void doDispatch(char const* buff, int n, sockaddr_storage* peer);
 
   rtError init();
   rtError openUnicastSocket();
   rtError openMulticastSocket();
 
   // command handlers
-  rtError onSearch(rtJsonDocPtr const& doc, rtEndpointAddr const& soc);
-  rtError onLocate(rtJsonDocPtr const& doc, rtEndpointAddr const& soc);
+  rtError onSearch(rtJsonDocPtr const& doc, sockaddr_storage const& soc);
+  rtError onLocate(rtJsonDocPtr const& doc, sockaddr_storage const& soc);
 
 private:
   sockaddr_storage  m_mcast_dest;

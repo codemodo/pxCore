@@ -3,7 +3,6 @@
 
 #include "rtRemoteTypes.h"
 #include "rtSocketUtils.h"
-#include "rtRemoteEndpoint.h"
 
 #include <condition_variable>
 #include <deque>
@@ -26,7 +25,7 @@ public:
   using MessageHandler = std::function<rtError (rtJsonDocPtr const& doc)>;
 
   rtRemoteStream(rtRemoteEnvPtr env, int fd,
-    rtEndpointAddr const& local_endpoint, rtEndpointAddr const& remote_endpoint);
+    sockaddr_storage const& local_endpoint, sockaddr_storage const& remote_endpoint);
   ~rtRemoteStream();
 
   rtRemoteStream(rtRemoteStream const&) = delete;
@@ -37,17 +36,17 @@ public:
 
   rtError open();
   rtError close();
-  rtError connectTo(rtEndpointAddr const& endpoint);
+  rtError connectTo(sockaddr_storage const& endpoint);
   rtError connect();
   rtError send(rtRemoteMessage const& msg);
   rtError sendRequest(rtRemoteRequest const& req, MessageHandler handler, uint32_t timeout = 1000);
   rtError setMessageCallback(MessageHandler handler);
   rtError setInactivityCallback(rtRemoteInactivityHandler handler);
 
-  inline rtEndpointAddr getLocalEndpoint() const
+  inline sockaddr_storage getLocalEndpoint() const
     { return m_local_endpoint; }
 
-  inline rtEndpointAddr getRemoteEndpoint() const
+  inline sockaddr_storage getRemoteEndpoint() const
     { return m_remote_endpoint; }
 
 private:
@@ -79,8 +78,8 @@ private:
   std::mutex                m_mutex;
   std::condition_variable   m_cond;
   rtRequestMap              m_requests;
-  rtEndpointAddr            m_local_endpoint;
-  rtEndpointAddr            m_remote_endpoint;
+  sockaddr_storage          m_local_endpoint;
+  sockaddr_storage          m_remote_endpoint;
 
   // work queue
   std::vector<std::thread*> m_dispatch_threads;
@@ -110,11 +109,6 @@ private:
   std::shared_ptr< std::thread >                  m_thread;
   std::mutex                                      m_mutex;
   int                                             m_shutdown_pipe[2];
-};
-
-
-#endif
-down_pipe[2];
 };
 
 

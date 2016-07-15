@@ -66,9 +66,8 @@ private:
   using CommandHandlerMap = std::map< std::string, rtRemoteMessageHandler >;
   using ObjectRefeMap = std::map< std::string, ObjectReference >;
 
-  rtEndpointAddr                m_rpc_endpoint;
+  sockaddr_storage              m_rpc_endpoint;
   int                           m_listen_fd;
-  //TODOaf merge these two into Endpoint
 
   std::unique_ptr<std::thread>  m_thread;
   mutable std::mutex            m_mutex;
