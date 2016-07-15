@@ -11,27 +11,39 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-rtEndpointAddr const& rtRemoteEndpointCreate(rtRemoteEnvPtr env, std::string s)
+endpoint_addr const& rtEndpointAddrCreate(std::string uri)
 {
-
+  
 }
 
-struct rtEndpointAddr
+// class rtIEndpoint
+// class rtIEndpointConnection
+// class rtIEndpointLocal
+// class rtIEndpointRemote
+
+// concrete implementations
+// class rtEndpointPipe
+struct endpoint_addr
 {
-  std::string uri;
-  std::string scheme;
+  endpoint_family_t family;
+  std::string uri; // maybe have array of key:value pairs here?
 };
 
-struct rtEndpointAddrUnix : rtEndpointAddr
+struct endpoint_addr_local : endpoint_addr
 {
   std::string path;
 };
 
-struct rtEndpoingAddrInet : rtEndpointAddr
+struct endpoint_addr_remote : endpoint_addr, endpoint_addr_conn
 {
   std::string ip;
   int port;
 };
+
+struct endpoint_addr_conn: endpoint_addr
+{
+  endpoint_connection_t connection;
+}
 
 class rtRemoteIResource
 {

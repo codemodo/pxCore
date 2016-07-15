@@ -505,6 +505,12 @@ rtRemoteServer::openRpcListener()
     rtGetDefaultInterface(m_rpc_endpoint, 0);
   }
 
+  //
+  // local, remote
+  // stream, dgram
+  // 
+  //
+
   m_listen_fd = socket(m_rpc_endpoint.ss_family, SOCK_STREAM, 0);
   if (m_listen_fd < 0)
   {
