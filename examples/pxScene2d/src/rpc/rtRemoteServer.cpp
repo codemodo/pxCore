@@ -484,9 +484,6 @@ rtRemoteServer::openRpcListener()
   int ret = 0;
   char path[UNIX_PATH_MAX];
 
-  std::stringstream uri_buff;
-  uri_buff << "tcp://";
-
   memset(path, 0, sizeof(path));
   cleanup_stale_unix_sockets();
 
@@ -513,6 +510,11 @@ rtRemoteServer::openRpcListener()
   // }
 
   // socketToEndpoint
+  std::stringstream uri_buff;
+  uri_buff << "tcp://";
+  // std::string tmp = rtSocketToString(m_rpc_socket);
+  // tmp = tmp.substr(tmp.find(:) + 1, std::string::npos);
+  // uri_buff << tmp;
   void* addr = nullptr;
   char buff[128];
   rtGetInetAddr(m_rpc_socket, &addr);

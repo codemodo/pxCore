@@ -2,12 +2,11 @@
 #include "rtRemoteTypes.h"
 
 
-namespace Addr {
-	enum NetType { IPV4, IPV6, ICMP };
-	//enum SockType { STREAM, DGRAM, NONE };
-	enum CastType { UNI, MULTI, BROAD };
-};
+enum class NetType { IPV4, IPV6, ICMP, UNK };
+enum class CastType { UNI, MULTI, BROAD, UNK };
+enum class ConnType { STREAM, DGRAM, UNK };
 
+/* Abstract base class for endpoint addresses */
 class rtRemoteIAddress
 {
 public:
@@ -23,6 +22,7 @@ protected:
 	std::string m_scheme;
 };
 
+/* Local endpoint addresses */
 class rtRemoteLocalAddress : public virtual rtRemoteIAddress
 {
 public:
@@ -39,10 +39,12 @@ protected:
 	std::string m_path;
 };
 
+/* Remote endpoint addresses */
 class rtRemoteNetAddress : public virtual rtRemoteIAddress
 {
 public:
-	rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port);
+    rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port);
+	rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port, NetType nt, CastType ct);
 	
 	virtual std::string toUri() override;
 
@@ -52,19 +54,20 @@ public:
 	inline int port() const
 	  { return m_port; }
 
-	inline Addr::NetType netType() const
+	inline NetType netType() const
 	  { return m_net_type; }
 
-	inline Addr::CastType castType() const
+	inline CastType castType() const
 	  { return m_cast_type; }
 
 protected:
-	std::string    m_host;
-	int            m_port;
-	Addr::NetType  m_net_type;
-	Addr::CastType m_cast_type;
+	std::string         m_host;
+	int                 m_port;
+	NetType  m_net_type;
+	CastType m_cast_type;
 };
 
+/* Remote endpoint addresses with path */
 class rtRemoteDistributedAddress : public rtRemoteNetAddress, public rtRemoteLocalAddress
 {
 public:
@@ -73,7 +76,7 @@ public:
 };
 
 rtRemoteIAddress*  rtRemoteAddressCreate(rtRemoteEnvironment* env, std::string const& uri);
-// rtRemoteIAddress*  createTcpAddr(std::string const& uri);
+rtRemoteIAddress*  createTcpAddress(std::string const& uri);
 
 
 
