@@ -1,80 +1,108 @@
-#include <errno.h>
-#include <fcntl.h>
-#include <string.h>
-#include <netinet/in.h>
-#include <net/if.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <ifaddrs.h>
-#include <sys/file.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include <string>
 
-endpoint_addr const& rtEndpointAddrCreate(std::string uri)
-{
-  
-}
 
-// class rtIEndpoint
-// class rtIEndpointConnection
-// class rtIEndpointLocal
-// class rtIEndpointRemote
-
-// concrete implementations
-// class rtEndpointPipe
-struct endpoint_addr
-{
-  endpoint_family_t family;
-  std::string uri; // maybe have array of key:value pairs here?
+namespace Addr {
+	enum NetType { IPV4, IPV6, ICMP };
+	//enum SockType { STREAM, DGRAM, NONE };
+	enum CastType { UNI, MULTI, BROAD };
 };
 
-struct endpoint_addr_local : endpoint_addr
-{
-  std::string path;
-};
-
-struct endpoint_addr_remote : endpoint_addr, endpoint_addr_conn
-{
-  std::string ip;
-  int port;
-};
-
-struct endpoint_addr_conn: endpoint_addr
-{
-  endpoint_connection_t connection;
-}
-
-class rtRemoteIResource
+class rtRemoteIAddress
 {
 public:
-  rtRemoteIResource(rtEndpointAddr const& ep_addr);
-  ~rtRemoteIResource();
+	rtRemoteIAddress(std::string const& scheme);
+	virtual ~rtRemoteIAddress();
 
-  virtual rtError Open(int* fd) = 0;
-  
-  inline rtEndpointAddr GetEndpointAddr() const
-    { return m_endpoint_addr; }
-  
-  inline int GetFd() const
-    { return m_fd; }
+	virtual std::string toUri() = 0;
+
+	inline std::string scheme() const
+	  { return m_scheme; }
 
 protected:
-  rtEndpointAddr m_endpoint_addr;
-  int m_fd;
+	std::string m_scheme;
 };
 
-class rtRemoteILocalResource : public virtual rtRemoteIResource
+class rtRemoteLocalAddress : public virtual rtRemoteIAddress
 {
 public:
-  rtRemoteILocalResource(rtEndpointAddr const& ep_addr);
-  ~rtRemoteILocalResource();
+	rtRemoteLocalAddress(std::string const& scheme, std::string const& path);
+	
+	virtual std::string toUri() override;
+
+	bool isSocket();
+
+	inline std::string path() const
+	  { return m_path; }
+
+protected:
+	std::string m_path;
 };
 
-
-class rtRemoteINetworkResource : public virtual rtRemoteIResource
+class rtRemoteNetAddress : public virtual rtRemoteIAddress
 {
 public:
-  rtRemoteINetworkResource(rtEndpointAddr const& ep_addr);
-  ~rtRemoteINetworkResource();
+	rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port);
+	
+	virtual std::string toUri() override;
+
+	inline std::string host() const
+	  { return m_host; }
+
+	inline int port() const
+	  { return m_port; }
+
+	inline Addr::NetType netType() const
+	  { return m_net_type; }
+
+	inline Addr::CastType castType() const
+	  { return m_cast_type; }
+
+protected:
+	std::string    m_host;
+	int            m_port;
+	Addr::NetType  m_net_type;
+	Addr::CastType m_cast_type;
 };
+
+class rtRemoteDistributedAddress : public rtRemoteNetAddress, public rtRemoteLocalAddress
+{
+public:
+	rtRemoteDistributedAddress(std::string const& scheme, std::string const& host, int port, std::string const& path);
+	virtual std::string toUri() override;
+};
+
+rtRemoteIAddress* rtRemoteAddressCreate(std::string uri);
+
+// class rtRemoteIResource
+// {
+// public:
+//   rtRemoteIResource(rtEndpointAddr const& ep_addr);
+//   ~rtRemoteIResource();
+
+//   virtual rtError Open(int* fd) = 0;
+  
+//   inline rtEndpointAddr GetEndpointAddr() const
+//     { return m_endpoint_addr; }
+  
+//   inline int GetFd() const
+//     { return m_fd; }
+
+// protected:
+//   rtEndpointAddr m_endpoint_addr;
+//   int m_fd;
+// };
+
+// class rtRemoteILocalResource : public virtual rtRemoteIResource
+// {
+// public:
+//   rtRemoteILocalResource(rtEndpointAddr const& ep_addr);
+//   ~rtRemoteILocalResource();
+// };
+
+
+// class rtRemoteINetworkResource : public virtual rtRemoteIResource
+// {
+// public:
+//   rtRemoteINetworkResource(rtEndpointAddr const& ep_addr);
+//   ~rtRemoteINetworkResource();
+// };

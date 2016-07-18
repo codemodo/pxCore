@@ -169,12 +169,13 @@ same_endpoint(sockaddr_storage const& addr1, sockaddr_storage const& addr2)
 }
 
 rtRemoteServer::rtRemoteServer(rtRemoteEnvironment* env)
-  : m_listen_fd(-1)
+  : m_rpc_endpoint(nullptr)
+  , m_listen_fd(-1)
   , m_resolver(nullptr)
   , m_keep_alive_interval(15)
   , m_env(env)
 {
-  memset(&m_rpc_endpoint, 0, sizeof(m_rpc_endpoint));
+  memset(&m_rpc_socket, 0, sizeof(m_rpc_socket));
 
   m_shutdown_pipe[0] = -1;
   m_shutdown_pipe[1] = -1;
@@ -240,6 +241,9 @@ rtRemoteServer::~rtRemoteServer()
     m_resolver->close();
     delete m_resolver;
   }
+
+  if (m_rpc_endpoint)
+    delete m_rpc_endpoint;
 }
 
 rtError
@@ -480,6 +484,9 @@ rtRemoteServer::openRpcListener()
   int ret = 0;
   char path[UNIX_PATH_MAX];
 
+  std::stringstream uri_buff;
+  uri_buff << "tcp://";
+
   memset(path, 0, sizeof(path));
   cleanup_stale_unix_sockets();
 
@@ -496,20 +503,37 @@ rtRemoteServer::openRpcListener()
       rtLogInfo("error trying to remove %s. %s", path, rtStrError(e));
     }
 
-    struct sockaddr_un *un_addr = reinterpret_cast<sockaddr_un*>(&m_rpc_endpoint);
+    struct sockaddr_un *un_addr = reinterpret_cast<sockaddr_un*>(&m_rpc_socket);
     un_addr->sun_family = AF_UNIX;
     strncpy(un_addr->sun_path, path, UNIX_PATH_MAX);
   }
   else
   {
-    rtGetDefaultInterface(m_rpc_endpoint, 0);
+    rtGetDefaultInterface(m_rpc_socket, 0);
   }
 
-  //
-  // local, remote
-  // stream, dgram
-  // 
-  //
+  // socketToEndpoint
+  rtGetInetAddr(rpc_endpoint, &addr);
+
+  if (rpc_endpoint.ss_family == AF_UNIX)
+  {
+    m_rpc_addr = reinterpret_cast<const char*>(addr);
+    m_rpc_port = 0;
+  }
+  else
+  {
+    socklen_t len;
+    rtSocketGetLength(rpc_endpoint, &len);
+    char const* p = inet_ntop(rpc_endpoint.ss_family, addr, buff, len);
+    if (p)
+      m_rpc_addr = p;
+
+    rtGetPort(rpc_endpoint, &m_rpc_port);
+  }
+
+  if (m_rpc_endpoint.ss_family == AF_UNIX)
+    uri_buff << 
+    
 
   m_listen_fd = socket(m_rpc_endpoint.ss_family, SOCK_STREAM, 0);
   if (m_listen_fd < 0)
