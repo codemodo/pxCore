@@ -61,7 +61,7 @@
     "type":"uint16" },
 
 { "name":"rt.rpc.resolver.file.db_path",
-    "default_value":"/tmp/rt_remote_resolver.json",
+    "default_value":"./tmp/rt_remote_resolver.json",
     "type":"string" },
 
 { "name":"rt.rpc.resolver.unicast.address",

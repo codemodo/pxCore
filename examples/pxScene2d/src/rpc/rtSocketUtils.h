@@ -16,7 +16,7 @@
 #define UNIX_PATH_MAX    108
 #endif
 
-#define kUnixSocketTemplateRoot "/tmp/rt_remote_soc"
+#define kUnixSocketTemplateRoot "./tmp/rt_remote_soc"
 
 rtError rtParseAddress(sockaddr_storage& ss, char const* addr, uint16_t port, uint32_t* index);
 rtError rtSocketGetLength(sockaddr_storage const& ss, socklen_t* len);

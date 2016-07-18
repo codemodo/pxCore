@@ -41,6 +41,8 @@ rtRemoteFactory::rtRemoteCreateResolver(rtRemoteEnvironment* env)
 {
   rtRemoteIResolver* resolver = nullptr;
   rtResolverType t = rtResolverTypeFromString(env->Config->resolver_type());
+  
+  t = RT_RESOLVER_FILE;
   switch (t)
   {
     case RT_RESOLVER_MULTICAST:

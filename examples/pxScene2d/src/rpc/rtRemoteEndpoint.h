@@ -1,4 +1,5 @@
 #include <string>
+#include "rtRemoteTypes.h"
 
 
 namespace Addr {
@@ -71,7 +72,11 @@ public:
 	virtual std::string toUri() override;
 };
 
-rtRemoteIAddress* rtRemoteAddressCreate(std::string uri);
+rtRemoteIAddress*  rtRemoteAddressCreate(rtRemoteEnvironment* env, std::string const& uri);
+// rtRemoteIAddress*  createTcpAddr(std::string const& uri);
+
+
+
 
 // class rtRemoteIResource
 // {

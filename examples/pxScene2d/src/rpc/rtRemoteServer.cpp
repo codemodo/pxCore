@@ -270,7 +270,7 @@ rtRemoteServer::registerObject(std::string const& name, rtObjectRef const& obj)
   rtObjectRef ref = m_env->ObjectCache->findObject(name);
   if (!ref)
     m_env->ObjectCache->insert(name, obj, -1);
-  m_resolver->registerObject(name, m_rpc_endpoint);
+  m_resolver->registerObject(name, m_rpc_socket);
   return RT_OK;
 }
 
@@ -389,7 +389,7 @@ rtRemoteServer::processMessage(std::shared_ptr<rtRemoteClient>& client, rtJsonDo
 rtError
 rtRemoteServer::start()
 {
-  rtError err = m_resolver->open(m_rpc_endpoint);
+  rtError err = m_resolver->open(m_rpc_socket);
   if (err != RT_OK)
   {
     rtLogWarn("failed to open resolver. %s", rtStrError(err));
@@ -490,52 +490,63 @@ rtRemoteServer::openRpcListener()
   memset(path, 0, sizeof(path));
   cleanup_stale_unix_sockets();
 
-  if (is_unix_domain(m_env))
-  {
-    rtError e = rtCreateUnixSocketName(0, path, sizeof(path));
-    if (e != RT_OK)
-      return e;
+  // if (is_unix_domain(m_env))
+  // {
+  //   rtError e = rtCreateUnixSocketName(0, path, sizeof(path));
+  //   if (e != RT_OK)
+  //     return e;
 
-    ret = unlink(path); // reuse path if needed
-    if (ret == -1 && errno != ENOENT)
-    {
-      rtError e = rtErrorFromErrno(errno);
-      rtLogInfo("error trying to remove %s. %s", path, rtStrError(e));
-    }
+  //   ret = unlink(path); // reuse path if needed
+  //   if (ret == -1 && errno != ENOENT)
+  //   {
+  //     rtError e = rtErrorFromErrno(errno);
+  //     rtLogInfo("error trying to remove %s. %s", path, rtStrError(e));
+  //   }
 
-    struct sockaddr_un *un_addr = reinterpret_cast<sockaddr_un*>(&m_rpc_socket);
-    un_addr->sun_family = AF_UNIX;
-    strncpy(un_addr->sun_path, path, UNIX_PATH_MAX);
-  }
-  else
-  {
+  //   struct sockaddr_un *un_addr = reinterpret_cast<sockaddr_un*>(&m_rpc_socket);
+  //   un_addr->sun_family = AF_UNIX;
+  //   strncpy(un_addr->sun_path, path, UNIX_PATH_MAX);
+  // }
+  // else
+  // {
     rtGetDefaultInterface(m_rpc_socket, 0);
-  }
+  // }
 
   // socketToEndpoint
-  rtGetInetAddr(rpc_endpoint, &addr);
+  void* addr = nullptr;
+  char buff[128];
+  rtGetInetAddr(m_rpc_socket, &addr);
 
-  if (rpc_endpoint.ss_family == AF_UNIX)
+  if (m_rpc_socket.ss_family == AF_UNIX)
   {
-    m_rpc_addr = reinterpret_cast<const char*>(addr);
-    m_rpc_port = 0;
+    uri_buff << reinterpret_cast<const char*>(addr);
   }
   else
   {
     socklen_t len;
-    rtSocketGetLength(rpc_endpoint, &len);
-    char const* p = inet_ntop(rpc_endpoint.ss_family, addr, buff, len);
+    rtSocketGetLength(m_rpc_socket, &len);
+    char const* p = inet_ntop(m_rpc_socket.ss_family, addr, buff, len);
     if (p)
-      m_rpc_addr = p;
-
-    rtGetPort(rpc_endpoint, &m_rpc_port);
+      uri_buff << p;
+    else
+    {
+      rtLogError("failed to create endpoint");
+      return RT_FAIL;
+    }
+    uint16_t port;
+    rtGetPort(m_rpc_socket, &port);
+    uri_buff << ":";
+    uri_buff << port;
   }
-
-  if (m_rpc_endpoint.ss_family == AF_UNIX)
-    uri_buff << 
+  
+  m_rpc_endpoint = rtRemoteAddressCreate(m_env, uri_buff.str());
+  rtRemoteNetAddress* m_tmp;
+  m_tmp = dynamic_cast<rtRemoteNetAddress*>(m_rpc_endpoint);
+  std::string host = m_tmp->host();
+  rtLogWarn("\n\n\nThe endpoint addr is %s", host.c_str());
     
 
-  m_listen_fd = socket(m_rpc_endpoint.ss_family, SOCK_STREAM, 0);
+  m_listen_fd = socket(m_rpc_socket.ss_family, SOCK_STREAM, 0);
   if (m_listen_fd < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -545,7 +556,7 @@ rtRemoteServer::openRpcListener()
 
   fcntl(m_listen_fd, F_SETFD, fcntl(m_listen_fd, F_GETFD) | FD_CLOEXEC);
 
-  if (m_rpc_endpoint.ss_family != AF_UNIX)
+  if (m_rpc_socket.ss_family != AF_UNIX)
   {
     uint32_t one = 1;
     if (-1 == setsockopt(m_listen_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
@@ -553,9 +564,9 @@ rtRemoteServer::openRpcListener()
   }
 
   socklen_t len;
-  rtSocketGetLength(m_rpc_endpoint, &len);
+  rtSocketGetLength(m_rpc_socket, &len);
 
-  ret = ::bind(m_listen_fd, reinterpret_cast<sockaddr *>(&m_rpc_endpoint), len);
+  ret = ::bind(m_listen_fd, reinterpret_cast<sockaddr *>(&m_rpc_socket), len);
   if (ret < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -563,8 +574,8 @@ rtRemoteServer::openRpcListener()
     return e;
   }
 
-  rtGetSockName(m_listen_fd, m_rpc_endpoint);
-  rtLogInfo("local rpc listener on: %s", rtSocketToString(m_rpc_endpoint).c_str());
+  rtGetSockName(m_listen_fd, m_rpc_socket);
+  rtLogInfo("local rpc listener on: %s", rtSocketToString(m_rpc_socket).c_str());
 
   ret = fcntl(m_listen_fd, F_SETFL, O_NONBLOCK);
   if (ret < 0)

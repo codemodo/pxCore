@@ -15,6 +15,7 @@
 #include "rtRemoteTypes.h"
 #include "rtRemoteIResolver.h"
 #include "rtSocketUtils.h"
+#include "rtRemoteEndpoint.h"
 
 class rtRemoteClient;
 
@@ -66,7 +67,7 @@ private:
   using CommandHandlerMap = std::map< std::string, rtRemoteMessageHandler >;
   using ObjectRefeMap = std::map< std::string, ObjectReference >;
 
-  rtRemoteIEndpoint*            m_rpc_endpoint;
+  rtRemoteIAddress*             m_rpc_endpoint;
   sockaddr_storage              m_rpc_socket;
   int                           m_listen_fd;
 

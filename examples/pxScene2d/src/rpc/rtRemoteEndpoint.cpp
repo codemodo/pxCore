@@ -25,7 +25,7 @@ rtRemoteLocalAddress::toUri()
 {
   std::stringstream buff;
   buff << m_scheme;
-  buff << '://';
+  buff << "://";
   buff << m_path;
   return buff.str();
 }
@@ -42,9 +42,9 @@ rtRemoteNetAddress::toUri()
 {
   std::stringstream buff;
   buff << m_scheme;
-  buff << '://';
+  buff << "://";
   buff << m_host;
-  buff << ':';
+  buff << ":";
   buff << m_port;
   return buff.str();
 }
@@ -61,37 +61,38 @@ rtRemoteDistributedAddress::toUri()
 {
   std::stringstream buff;
   buff << m_scheme;
-  buff << '://';
+  buff << "://";
   buff << m_host;
-  buff << ':';
+  buff << ":";
   buff << m_port;
   buff << m_path;
   return buff.str();
 }
 
 
-using AddrCommandHandler = rtError (*)(std::string const&);
-using AddrCommandHandlerMap = std::map< std::string, AddrCommandHandler >;
-AddrCommandHandlerMap m_command_handlers();
-m_command_handlers.insert(CommandHandlerMap::value_type("tcp", createTcpAddr));
+// using AddrCommandHandler = rtError (*)(std::string const&);
+// using AddrCommandHandlerMap = std::map< std::string, AddrCommandHandler >;
+// AddrCommandHandlerMap m_command_handlers();
+// m_command_handlers.insert(CommandHandlerMap::value_type("tcp", createTcpAddr));
 
-rtRemoteIAddress* rtRemoteAddressCreate(std::string const& uri)
+rtRemoteIAddress* rtRemoteAddressCreate(rtRemoteEnvironment* env, std::string const& uri)
 {
-  std::string scheme = uri.substr(0, uri.find(":"));
+  // std::string scheme = uri.substr(0, uri.find(":"));
   
-  auto itr = m_command_handlers.find(scheme);
-  if (itr == m_command_handlers.end())
-  {
-    rtLogWarn("no command handler registered for: %s", message_type);
-    return;
-  }
+  // auto itr = m_command_handlers.find(scheme);
+  // if (itr == m_command_handlers.end())
+  // {
+  //   rtLogWarn("no command handler registered for: %s", message_type);
+  //   return;
+  // }
 
-  #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
+  // #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
 
-  return CALL_MEMBER_FN(*this, itr->second)(uri);
+  // return CALL_MEMBER_FN(*this, itr->second)(uri);
+  return new rtRemoteNetAddress("tcp", "127.0.0.1", 800);
 }
 
-rtRemoteIAddress* createTcpAddr(std::string const& uri)
-{
-  return new rtRemoteNetAddress("tcp", "127.0.0.1", "800");
-}
+// rtRemoteIAddress* createTcpAddr(std::string const& uri)
+// {
+//   return new rtRemoteNetAddress("tcp", "127.0.0.1", "800");
+// }
