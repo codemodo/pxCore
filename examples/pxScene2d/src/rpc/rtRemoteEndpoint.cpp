@@ -89,6 +89,7 @@ rtRemoteDistributedAddress::toUri()
 static NetType rtRemoteParseNetType(std::string const& host);
 static CastType rtRemoteParseCastType(std::string const& host, NetType net_type);
 static rtError EndpointAddressToSocket(rtRemoteIAddress const& addr, sockaddr_storage* sock);
+rtError SocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress* endpoint_addr)
 
 // using AddrCommandHandler = rtError (*)(std::string const&);
 // using AddrCommandHandlerMap = std::map< std::string, AddrCommandHandler >;
@@ -96,7 +97,7 @@ static rtError EndpointAddressToSocket(rtRemoteIAddress const& addr, sockaddr_st
 // m_command_handlers.insert(CommandHandlerMap::value_type("tcp", createTcpAddr));
 
 rtError
-rtRemoteAddressCreate(rtRemoteEnvironment* env, std::string const& uri, rtRemoteIAddress& endpoint_addr)
+rtRemoteAddressCreate(rtRemoteEnvironment* env, std::string const& uri, rtRemoteIAddress* endpoint_addr)
 {
   // std::string scheme = uri.substr(0, uri.find(":"));
   
@@ -120,7 +121,7 @@ rtRemoteAddressCreate(rtRemoteEnvironment* env, std::string const& uri, rtRemote
 
 //TODO convert to returning rtError
 rtError
-createTcpAddress(std::string const& uri, rtRemoteIAddress& endpoint_addr)
+createTcpAddress(std::string const& uri, rtRemoteIAddress* endpoint_addr)
 {
   int index;
   index = uri.find("://");
