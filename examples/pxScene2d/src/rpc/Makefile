@@ -33,7 +33,8 @@ RTRPC_SRCS=\
   rtRemoteNsResolver.cpp \
   rtRemoteNameService.cpp \
   rtRemoteConfigBuilder.cpp \
-  rtRemoteEndpoint.cpp
+  rtRemoteEndpoint.cpp \
+  rtRemoteUtils.cpp
 
 SAMPLEAPP_SRCS=\
   rpc_main.cpp

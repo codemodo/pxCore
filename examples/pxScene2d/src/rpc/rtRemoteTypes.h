@@ -20,6 +20,11 @@ class rtRemoteServer;
 class rtRemoteConfig;
 class rtRemoteStreamSelector;
 class rtObjectCache;
+class rtRemoteFactory;
+
+enum class NetType { IPV4, IPV6, ICMP, UNK };
+enum class CastType { UNI, MULTI, BROAD, UNK };
+enum class ConnType { STREAM, DGRAM, UNK };
 
 struct rtRemoteEnvironment
 {
@@ -35,6 +40,7 @@ struct rtRemoteEnvironment
   rtRemoteServer*           Server;
   rtObjectCache*            ObjectCache;
   rtRemoteStreamSelector*   StreamSelector;
+  rtRemoteFactory*          Factory;
 
   uint32_t RefCount;
   bool     Initialized;

@@ -1,6 +1,7 @@
 #include "rtRemoteIResolver.h"
 #include "rtRemoteTypes.h"
-
+#include "rtRemoteEndpoint.h"
+#include "rtRemoteUtils.h"
 enum rtResolverType
 {
   RT_RESOLVER_MULTICAST,
@@ -10,9 +11,18 @@ enum rtResolverType
 
 class rtRemoteFactory
 {
-private:
-  rtRemoteFactory();
-  ~rtRemoteFactory();
 public:
-  static rtRemoteIResolver* rtRemoteCreateResolver(rtRemoteEnvironment* env);
+  rtRemoteFactory(rtRemoteEnvironment* env);
+  ~rtRemoteFactory();
+private:
+  using AddrCommandHandler = rtError (*)(std::string const&, rtRemoteIAddress*&);
+  using AddrCommandHandlerMap = std::map< std::string, AddrCommandHandler >;
+
+public:
+  rtRemoteIResolver* rtRemoteCreateResolver(rtRemoteEnvironment* env);
+  rtError rtRemoteAddressCreate(rtRemoteEnvironment* env, std::string const& uri, rtRemoteIAddress*& addr);
+  void registerFunction(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteIAddress *&));
+  
+  rtRemoteEnvironment* m_env;
+  AddrCommandHandlerMap m_command_handlers;
 };

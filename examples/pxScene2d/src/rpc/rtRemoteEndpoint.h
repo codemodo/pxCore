@@ -1,10 +1,8 @@
+#ifndef __RT_REMOTE_ENDPOINT_H__
+#define __RT_REMOTE_ENDPOINT_H__
+
 #include <string>
 #include "rtRemoteTypes.h"
-
-
-enum class NetType { IPV4, IPV6, ICMP, UNK };
-enum class CastType { UNI, MULTI, BROAD, UNK };
-enum class ConnType { STREAM, DGRAM, UNK };
 
 /* Abstract base class for endpoint addresses */
 class rtRemoteIAddress
@@ -75,9 +73,8 @@ public:
 	virtual std::string toUri() override;
 };
 
-rtRemoteIAddress*  rtRemoteAddressCreate(rtRemoteEnvironment* env, std::string const& uri);
-rtRemoteIAddress*  createTcpAddress(std::string const& uri);
 
+#endif
 
 
 

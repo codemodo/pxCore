@@ -253,7 +253,7 @@ rtRemoteServer::open()
   if (err != RT_OK)
     return err;
 
-  m_resolver = rtRemoteFactory::rtRemoteCreateResolver(m_env);
+  m_resolver = m_env->Factory->rtRemoteCreateResolver(m_env);
   err = start();
   if (err != RT_OK)
   {
@@ -541,7 +541,7 @@ rtRemoteServer::openRpcListener()
     uri_buff << port;
   }
   
-  m_rpc_endpoint = rtRemoteAddressCreate(m_env, uri_buff.str());
+  rtError err = m_env->Factory->rtRemoteAddressCreate(m_env, uri_buff.str(), m_rpc_endpoint);
   rtRemoteNetAddress* m_tmp;
   m_tmp = dynamic_cast<rtRemoteNetAddress*>(m_rpc_endpoint);
   std::string host = m_tmp->host();

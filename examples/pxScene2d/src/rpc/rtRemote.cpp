@@ -9,6 +9,7 @@
 #include "rtRemoteServer.h"
 #include "rtRemoteStream.h"
 #include "rtRemoteNameService.h"
+#include "rtRemoteFactory.h"
 
 #include <rtLog.h>
 
@@ -23,12 +24,16 @@ rtRemoteEnvironment::rtRemoteEnvironment(rtRemoteConfig* config)
   , StreamSelector(nullptr)
   , RefCount(1)
   , Initialized(false)
+  , Factory(nullptr)
 {
   StreamSelector = new rtRemoteStreamSelector();
   StreamSelector->start();
 
   Server = new rtRemoteServer(this);
   ObjectCache = new rtObjectCache(this);
+
+  Factory = new rtRemoteFactory(this);
+  Factory->registerFunction("tcp", &createTcpAddress);
 }
 
 rtRemoteEnvironment::~rtRemoteEnvironment()
