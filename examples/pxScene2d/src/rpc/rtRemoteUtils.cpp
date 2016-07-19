@@ -1,4 +1,5 @@
 #include "rtRemoteUtils.h"
+#include "rtRemoteTypes.h"
 #include <sstream>
 #include <string>
 #include <arpa/inet.h>
@@ -48,7 +49,7 @@ rtRemoteParseCastType(std::string const& host, NetType net_type)
   if (net_type == NetType::IPV4)
   {
     prefix = host.substr(0, host.find('.'));
-    if (stoi(prefix) >= 224 || stoi(prefix) <= 239)
+    if (stoi(prefix) >= 224 && stoi(prefix) <= 239)
       result = CastType::MULTI;
     else
       result = CastType::UNI;
@@ -68,11 +69,11 @@ rtRemoteParseCastType(std::string const& host, NetType net_type)
 }
 
 rtError
-EndpointAddressToSocket(rtRemoteIAddress& addr, sockaddr_storage& ss)
+rtRemoteEndpointAddressToSocket(rtRemoteIAddress*& addr, sockaddr_storage& ss)
 {
-  if (typeid(addr) == typeid(rtRemoteLocalAddress))
+  if (dynamic_cast<rtRemoteLocalAddress*>(addr) != nullptr)
   {
-    rtRemoteLocalAddress* tmp = reinterpret_cast<rtRemoteLocalAddress*>(&addr);
+    rtRemoteLocalAddress* tmp = dynamic_cast<rtRemoteLocalAddress*>(addr);
     if (!tmp->isSocket())
     {
       rtLogError("local address is not unix domain socket");
@@ -80,9 +81,9 @@ EndpointAddressToSocket(rtRemoteIAddress& addr, sockaddr_storage& ss)
     }
     return rtParseAddress(ss, tmp->path().c_str(), 0, nullptr);
   }
-  else if (typeid(addr) == typeid(rtRemoteNetAddress))
+  else if (dynamic_cast<rtRemoteNetAddress*>(addr) != nullptr)
   {
-    rtRemoteNetAddress* tmp = reinterpret_cast<rtRemoteNetAddress*>(&addr);
+    rtRemoteNetAddress* tmp = dynamic_cast<rtRemoteNetAddress*>(addr);
     return rtParseAddress(ss,tmp->host().c_str(), tmp->port(), nullptr);
   }
   else
@@ -92,7 +93,7 @@ EndpointAddressToSocket(rtRemoteIAddress& addr, sockaddr_storage& ss)
 }
 
 rtError
-SocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress*& endpoint_addr)
+rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress*& endpoint_addr)
 {
   std::stringstream buff;
   

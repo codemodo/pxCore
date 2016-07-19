@@ -176,6 +176,7 @@ rtRemoteServer::rtRemoteServer(rtRemoteEnvironment* env)
   , m_env(env)
 {
   memset(&m_rpc_socket, 0, sizeof(m_rpc_socket));
+  //memset(&m_srv_endpoint, 0, sizeof(m_srv_endpoint));
 
   m_shutdown_pipe[0] = -1;
   m_shutdown_pipe[1] = -1;
@@ -270,6 +271,9 @@ rtRemoteServer::registerObject(std::string const& name, rtObjectRef const& obj)
   rtObjectRef ref = m_env->ObjectCache->findObject(name);
   if (!ref)
     m_env->ObjectCache->insert(name, obj, -1);
+  rtRemoteIAddress* tmp;
+  rtRemoteSocketToEndpointAddress(m_rpc_socket, ConnType::STREAM, tmp);
+  rtRemoteNetAddress* tmp2 = dynamic_cast<rtRemoteNetAddress*>(tmp); 
   m_resolver->registerObject(name, m_rpc_socket);
   return RT_OK;
 }
@@ -291,11 +295,11 @@ rtRemoteServer::runListener()
     fd_set err_fds;
 
     FD_ZERO(&read_fds);
-    rtPushFd(&read_fds, m_listen_fd, &maxFd);
+    rtPushFd(&read_fds, m_srv_endpoint->fd(), &maxFd);
     rtPushFd(&read_fds, m_shutdown_pipe[0], &maxFd);
 
     FD_ZERO(&err_fds);
-    rtPushFd(&err_fds, m_listen_fd, &maxFd);
+    rtPushFd(&err_fds, m_srv_endpoint->fd(), &maxFd);
 
     timeval timeout;
     timeout.tv_sec = 1;
@@ -317,8 +321,8 @@ rtRemoteServer::runListener()
       return;
     }
 
-    if (FD_ISSET(m_listen_fd, &read_fds))
-      doAccept(m_listen_fd);
+    if (FD_ISSET(m_srv_endpoint->fd(), &read_fds))
+      doAccept(m_srv_endpoint->fd());
 
     time_t now = time(nullptr);
     if (now - lastKeepAliveCheck > 1)
@@ -333,6 +337,8 @@ rtRemoteServer::runListener()
 void
 rtRemoteServer::doAccept(int fd)
 {
+  rtRemoteIAddress* peer;
+  m_srv_endpoint->accepts(peer);
   sockaddr_storage remote_endpoint;
   memset(&remote_endpoint, 0, sizeof(remote_endpoint));
 
@@ -542,58 +548,8 @@ rtRemoteServer::openRpcListener()
   }
   
   rtError err = m_env->Factory->rtRemoteAddressCreate(m_env, uri_buff.str(), m_rpc_endpoint);
-  rtRemoteNetAddress* m_tmp;
-  m_tmp = dynamic_cast<rtRemoteNetAddress*>(m_rpc_endpoint);
-  std::string host = m_tmp->host();
-  rtLogWarn("\n\n\nThe endpoint addr is %s", host.c_str());
-    
-
-  m_listen_fd = socket(m_rpc_socket.ss_family, SOCK_STREAM, 0);
-  if (m_listen_fd < 0)
-  {
-    rtError e = rtErrorFromErrno(errno);
-    rtLogError("failed to create socket. %s", rtStrError(e));
-    return e;
-  }
-
-  fcntl(m_listen_fd, F_SETFD, fcntl(m_listen_fd, F_GETFD) | FD_CLOEXEC);
-
-  if (m_rpc_socket.ss_family != AF_UNIX)
-  {
-    uint32_t one = 1;
-    if (-1 == setsockopt(m_listen_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
-      rtLogError("setting TCP_NODELAY failed");
-  }
-
-  socklen_t len;
-  rtSocketGetLength(m_rpc_socket, &len);
-
-  ret = ::bind(m_listen_fd, reinterpret_cast<sockaddr *>(&m_rpc_socket), len);
-  if (ret < 0)
-  {
-    rtError e = rtErrorFromErrno(errno);
-    rtLogError("failed to bind socket. %s", rtStrError(e));
-    return e;
-  }
-
-  rtGetSockName(m_listen_fd, m_rpc_socket);
-  rtLogInfo("local rpc listener on: %s", rtSocketToString(m_rpc_socket).c_str());
-
-  ret = fcntl(m_listen_fd, F_SETFL, O_NONBLOCK);
-  if (ret < 0)
-  {
-    rtError e = rtErrorFromErrno(errno);
-    rtLogError("fcntl: %s", rtStrError(e));
-    return e;
-  }
-
-  ret = listen(m_listen_fd, 2);
-  if (ret < 0)
-  {
-    rtError e = rtErrorFromErrno(errno);
-    rtLogError("failed to put socket in listen mode. %s", rtStrError(e));
-    return e;
-  }
+  m_srv_endpoint = new rtRemoteServerEndpoint(m_rpc_endpoint);
+  err = m_srv_endpoint->open();
 
   return RT_OK;
 }

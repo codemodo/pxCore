@@ -3,6 +3,8 @@
 
 #include <string>
 #include "rtRemoteTypes.h"
+#include "rtRemoteUtils.h"
+
 
 /* Abstract base class for endpoint addresses */
 class rtRemoteIAddress
@@ -41,7 +43,7 @@ protected:
 class rtRemoteNetAddress : public virtual rtRemoteIAddress
 {
 public:
-    rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port);
+  rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port);
 	rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port, NetType nt, CastType ct);
 	
 	virtual std::string toUri() override;
@@ -74,28 +76,45 @@ public:
 };
 
 
+
+
+
+
+class rtRemoteIEndpoint
+{
+public:
+  rtRemoteIEndpoint(rtRemoteIAddress*& addr);
+  virtual ~rtRemoteIEndpoint();
+
+  virtual rtError open() = 0;
+  
+  inline rtRemoteIAddress* GetEndpointAddr() const
+    { return m_addr; }
+  
+  inline int fd() const
+    { return m_listen_fd; }
+
+	inline void SetFd(int fd)
+	  { m_listen_fd = fd; }
+
+	inline void SetAddr(rtRemoteIAddress* addr)
+	  { m_addr = addr; }
+
+protected:
+  rtRemoteIAddress* m_addr;
+  int m_listen_fd;
+};
+
+class rtRemoteServerEndpoint : public rtRemoteIEndpoint
+{
+public:
+  rtRemoteServerEndpoint(rtRemoteIAddress*& addr);
+
+  virtual rtError open() override;
+	rtError accepts(rtRemoteIAddress*& addr);
+};
+
 #endif
-
-
-
-// class rtRemoteIResource
-// {
-// public:
-//   rtRemoteIResource(rtEndpointAddr const& ep_addr);
-//   ~rtRemoteIResource();
-
-//   virtual rtError Open(int* fd) = 0;
-  
-//   inline rtEndpointAddr GetEndpointAddr() const
-//     { return m_endpoint_addr; }
-  
-//   inline int GetFd() const
-//     { return m_fd; }
-
-// protected:
-//   rtEndpointAddr m_endpoint_addr;
-//   int m_fd;
-// };
 
 // class rtRemoteILocalResource : public virtual rtRemoteIResource
 // {

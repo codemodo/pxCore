@@ -1,5 +1,6 @@
 #include "rtRemoteEndpoint.h"
 #include "rtSocketUtils.h"
+#include "rtRemoteUtils.h"
 #include <sstream>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -8,6 +9,15 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <set>
+#include <algorithm>
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <rtLog.h>
+#include <dirent.h>
 
 // BASE //
 rtRemoteIAddress::rtRemoteIAddress(std::string const& scheme)
@@ -88,138 +98,94 @@ rtRemoteDistributedAddress::toUri()
   return buff.str();
 }
 
-// static NetType rtRemoteParseNetType(std::string const& host);
-// static CastType rtRemoteParseCastType(std::string const& host, NetType net_type);
-// static rtError EndpointAddressToSocket(rtRemoteIAddress const& addr, sockaddr_storage* sock);
-// static rtError SocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress*& endpoint_addr);
+rtRemoteIEndpoint::rtRemoteIEndpoint(rtRemoteIAddress*& addr)
+: m_listen_fd(-1)
+, m_addr(addr)
+{
+  // empty
+}
 
-// NetType
-// rtRemoteParseNetType(std::string const& host)
-// {
-//   NetType result;
+rtRemoteIEndpoint::~rtRemoteIEndpoint()
+{
+  // empty
+}
 
-//   struct addrinfo hint, *res = NULL;
-//   int ret;
-//   memset(&hint, 0, sizeof hint);
-  
-//   hint.ai_family = AF_UNSPEC;
-//   hint.ai_flags = AI_NUMERICHOST;
+rtRemoteServerEndpoint::rtRemoteServerEndpoint(rtRemoteIAddress*& addr)
+: rtRemoteIEndpoint(addr)
+{
+  // empty
+}
 
-//   ret = getaddrinfo(host.c_str(), NULL, &hint, &res);
-//   if (ret) {
-//     rtLogWarn("uri contains invalid host address format: %s", host.c_str());
-//     return NetType::UNK;
-//   }
-//   if(res->ai_family == AF_INET) {
-//     result = NetType::IPV4;
-//   } else if (res->ai_family == AF_INET6) {
-//     result = NetType::IPV6;
-//   } else {
-//     rtLogWarn("uri contains unknown host address format: %s", host.c_str());
-//     return NetType::UNK;
-//   }
-//   freeaddrinfo(res);
+rtError
+rtRemoteServerEndpoint::open()
+{
+  int ret;
+  sockaddr_storage m_rpc_socket;
+  rtError err = rtRemoteEndpointAddressToSocket(m_addr, m_rpc_socket);
+  m_listen_fd = socket(m_rpc_socket.ss_family, SOCK_STREAM, 0);
+  if (m_listen_fd < 0)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogError("failed to create socket. %s", rtStrError(e));
+    return e;
+  }
 
-//   return result;
-// }
+  fcntl(m_listen_fd, F_SETFD, fcntl(m_listen_fd, F_GETFD) | FD_CLOEXEC);
 
-// CastType
-// rtRemoteParseCastType(std::string const& host, NetType net_type)
-// {
-//   CastType result;
+  if (m_rpc_socket.ss_family != AF_UNIX)
+  {
+    uint32_t one = 1;
+    if (-1 == setsockopt(m_listen_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
+      rtLogError("setting TCP_NODELAY failed");
+  }
 
-//   std::string prefix;
-//   if (net_type == NetType::IPV4)
-//   {
-//     prefix = host.substr(0, host.find('.'));
-//     if (stoi(prefix) >= 224 || stoi(prefix) <= 239)
-//       result = CastType::MULTI;
-//     else
-//       result = CastType::UNI;
-//   }
-//   else if (net_type == NetType::IPV6)
-//   {
-//     prefix = host.substr(0, 2);
-//     if (prefix.compare("FF") == 0)
-//       result = CastType::MULTI;
-//     else
-//       result = CastType::UNI;
-//   }
-//   else
-//    result = CastType::UNK;
-  
-//   return result;       
-// }
+  socklen_t len;
+  rtSocketGetLength(m_rpc_socket, &len);
 
-// rtError
-// EndpointAddressToSocket(rtRemoteIAddress& addr, sockaddr_storage& ss)
-// {
-//   if (typeid(addr) == typeid(rtRemoteLocalAddress))
-//   {
-//     rtRemoteLocalAddress* tmp = reinterpret_cast<rtRemoteLocalAddress*>(&addr);
-//     if (!tmp->isSocket())
-//     {
-//       rtLogError("local address is not unix domain socket");
-//       return RT_FAIL;
-//     }
-//     return rtParseAddress(ss, tmp->path().c_str(), 0, nullptr);
-//   }
-//   else if (typeid(addr) == typeid(rtRemoteNetAddress))
-//   {
-//     rtRemoteNetAddress* tmp = reinterpret_cast<rtRemoteNetAddress*>(&addr);
-//     return rtParseAddress(ss,tmp->host().c_str(), tmp->port(), nullptr);
-//   }
-//   else
-//   {
-//     return RT_FAIL;
-//   }
-// }
+  ret = ::bind(m_listen_fd, reinterpret_cast<sockaddr *>(&m_rpc_socket), len);
+  if (ret < 0)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogError("failed to bind socket. %s", rtStrError(e));
+    return e;
+  }
 
-// rtError
-// SocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress*& endpoint_addr)
-// {
-//   std::stringstream buff;
-  
-//   std::string scheme;
-//   if (conn_type == ConnType::STREAM)
-//   {
-//     scheme = "tcp";
-//   }
-//   else if (conn_type == ConnType::DGRAM)
-//   {
-//     scheme = "udp";
-//   }
-//   else
-//   {
-//     rtLogError("no connection protocol indicated while converting from socket to endpoint address");
-//     return RT_FAIL;
-//   }
+  rtGetSockName(m_listen_fd, m_rpc_socket);
+  rtLogInfo("local rpc listener on: %s", rtSocketToString(m_rpc_socket).c_str());
 
-//   buff << scheme;
-//   buff << "://";
+  ret = fcntl(m_listen_fd, F_SETFL, O_NONBLOCK);
+  if (ret < 0)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogError("fcntl: %s", rtStrError(e));
+    return e;
+  }
 
-//   void* addr = NULL;
-//   rtGetInetAddr(ss, &addr);
+  ret = listen(m_listen_fd, 2);
+  if (ret < 0)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogError("failed to put socket in listen mode. %s", rtStrError(e));
+    return e;
+  }
+}
 
-//   char addr_buff[128];
-//   memset(addr_buff, 0, sizeof(addr_buff));
+rtError
+rtRemoteServerEndpoint::accepts(rtRemoteIAddress*& peer)
+{
+  sockaddr_storage remote_endpoint;
+  memset(&remote_endpoint, 0, sizeof(remote_endpoint));
 
-//   // TODO need to figure out env thing
-//   if (ss.ss_family == AF_UNIX)
-//   {
-//     strncpy(addr_buff, (const char*)addr, sizeof(addr_buff) -1);
-//     buff << addr_buff;
-//     return createTcpAddress(buff.str(), endpoint_addr);
-//   }
-//   else
-//   {
-//     inet_ntop(ss.ss_family, addr, addr_buff, sizeof(addr_buff));
-//     uint16_t port;
-//     rtGetPort(ss, &port);
-//     buff << addr_buff;
-//     buff << ":";
-//     buff << port;
-//     return createTcpAddress(buff.str(), endpoint_addr);
-//   }
-//   return RT_OK;
-// }
+  socklen_t len = sizeof(sockaddr_storage);
+
+  int ret = accept(m_listen_fd, reinterpret_cast<sockaddr *>(&remote_endpoint), &len);
+  if (ret == -1)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogWarn("error accepting new tcp connect. %s", rtStrError(e));
+    return RT_FAIL;
+  }
+  rtLogInfo("new connection from %s with fd:%d", rtSocketToString(remote_endpoint).c_str(), ret);
+  return rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, peer);
+
+}
