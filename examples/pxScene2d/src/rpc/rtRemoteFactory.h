@@ -19,9 +19,10 @@ private:
   using AddrCommandHandlerMap = std::map< std::string, AddrCommandHandler >;
 
 public:
-  rtRemoteIResolver* rtRemoteCreateResolver(rtRemoteEnvironment* env);
-  rtError rtRemoteAddressCreate(rtRemoteEnvironment* env, std::string const& uri, rtRemoteIAddress*& addr);
-  void registerFunction(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteIAddress *&));
+  rtRemoteIResolver* createResolver(rtRemoteEnvironment* env);
+  rtError createAddress(std::string const& uri, rtRemoteIAddress*& addr);
+  rtError registerFunctionCreateAddress(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteIAddress *&));
+  rtError updateFunctionCreateAddress(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteIAddress *&));
   
   rtRemoteEnvironment* m_env;
   AddrCommandHandlerMap m_command_handlers;

@@ -68,9 +68,7 @@ private:
   using ObjectRefeMap = std::map< std::string, ObjectReference >;
 
   rtRemoteIAddress*             m_rpc_endpoint;
-  rtRemoteServerEndpoint*       m_srv_endpoint;
-  sockaddr_storage              m_rpc_socket;
-  int                           m_listen_fd;
+  rtRemoteStreamServerEndpoint* m_srv_endpoint;
 
   std::unique_ptr<std::thread>  m_thread;
   mutable std::mutex            m_mutex;

@@ -1,6 +1,5 @@
 #include "rtRemoteEndpoint.h"
 #include "rtSocketUtils.h"
-#include "rtRemoteUtils.h"
 #include <sstream>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -98,8 +97,13 @@ rtRemoteDistributedAddress::toUri()
   return buff.str();
 }
 
-rtRemoteIEndpoint::rtRemoteIEndpoint(rtRemoteIAddress*& addr)
-: m_listen_fd(-1)
+
+/////////////////////////
+// Endpoint abstractions                 
+/////////////////////////
+
+rtRemoteIEndpoint::rtRemoteIEndpoint(rtRemoteIAddress* const addr)
+: m_fd(-1)
 , m_addr(addr)
 {
   // empty
@@ -107,42 +111,55 @@ rtRemoteIEndpoint::rtRemoteIEndpoint(rtRemoteIAddress*& addr)
 
 rtRemoteIEndpoint::~rtRemoteIEndpoint()
 {
-  // empty
 }
 
-rtRemoteServerEndpoint::rtRemoteServerEndpoint(rtRemoteIAddress*& addr)
+rtRemoteStreamServerEndpoint::rtRemoteStreamServerEndpoint(rtRemoteIAddress* const addr)
 : rtRemoteIEndpoint(addr)
 {
-  // empty
+  memset(&m_socket, 0, sizeof(sockaddr_storage));
 }
 
 rtError
-rtRemoteServerEndpoint::open()
+rtRemoteStreamServerEndpoint::open()
 {
   int ret;
-  sockaddr_storage m_rpc_socket;
-  rtError err = rtRemoteEndpointAddressToSocket(m_addr, m_rpc_socket);
-  m_listen_fd = socket(m_rpc_socket.ss_family, SOCK_STREAM, 0);
-  if (m_listen_fd < 0)
+  rtError err = rtRemoteEndpointAddressToSocket(m_addr, m_socket);
+  m_fd = socket(m_socket.ss_family, SOCK_STREAM, 0);
+  if (m_fd < 0)
   {
     rtError e = rtErrorFromErrno(errno);
     rtLogError("failed to create socket. %s", rtStrError(e));
     return e;
   }
 
-  fcntl(m_listen_fd, F_SETFD, fcntl(m_listen_fd, F_GETFD) | FD_CLOEXEC);
+  fcntl(m_fd, F_SETFD, fcntl(m_fd, F_GETFD) | FD_CLOEXEC);
 
-  if (m_rpc_socket.ss_family != AF_UNIX)
+  if (m_socket.ss_family != AF_UNIX)
   {
     uint32_t one = 1;
-    if (-1 == setsockopt(m_listen_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
+    if (-1 == setsockopt(m_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
       rtLogError("setting TCP_NODELAY failed");
   }
 
-  socklen_t len;
-  rtSocketGetLength(m_rpc_socket, &len);
+  return RT_OK;
+}
 
-  ret = ::bind(m_listen_fd, reinterpret_cast<sockaddr *>(&m_rpc_socket), len);
+rtError
+rtRemoteStreamServerEndpoint::close()
+{
+  if (m_fd != -1)
+    ::close(m_fd);
+  return RT_OK;
+}
+
+rtError
+rtRemoteStreamServerEndpoint::doBind()
+{
+  int ret;
+  socklen_t len;
+  rtSocketGetLength(m_socket, &len);
+
+  ret = bind(m_fd, (struct sockaddr*)(&m_socket), len);
   if (ret < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -150,18 +167,24 @@ rtRemoteServerEndpoint::open()
     return e;
   }
 
-  rtGetSockName(m_listen_fd, m_rpc_socket);
-  rtLogInfo("local rpc listener on: %s", rtSocketToString(m_rpc_socket).c_str());
+  rtGetSockName(m_fd, m_socket);
+  rtLogInfo("local rpc listener on: %s", rtSocketToString(m_socket).c_str());
 
-  ret = fcntl(m_listen_fd, F_SETFL, O_NONBLOCK);
+  ret = fcntl(m_fd, F_SETFL, O_NONBLOCK);
   if (ret < 0)
   {
     rtError e = rtErrorFromErrno(errno);
     rtLogError("fcntl: %s", rtStrError(e));
     return e;
   }
+  return RT_OK;
+}
 
-  ret = listen(m_listen_fd, 2);
+rtError
+rtRemoteStreamServerEndpoint::doListen()
+{
+  int ret;
+  ret = listen(m_fd, 2);
   if (ret < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -171,21 +194,33 @@ rtRemoteServerEndpoint::open()
 }
 
 rtError
-rtRemoteServerEndpoint::accepts(rtRemoteIAddress*& peer)
+rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteIAddress*& remote_addr)
 {
   sockaddr_storage remote_endpoint;
   memset(&remote_endpoint, 0, sizeof(remote_endpoint));
 
   socklen_t len = sizeof(sockaddr_storage);
 
-  int ret = accept(m_listen_fd, reinterpret_cast<sockaddr *>(&remote_endpoint), &len);
-  if (ret == -1)
+  new_fd = accept(m_fd, (struct sockaddr*)(&remote_endpoint), &len);
+
+  if (new_fd == -1)
   {
     rtError e = rtErrorFromErrno(errno);
     rtLogWarn("error accepting new tcp connect. %s", rtStrError(e));
     return RT_FAIL;
   }
-  rtLogInfo("new connection from %s with fd:%d", rtSocketToString(remote_endpoint).c_str(), ret);
-  return rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, peer);
+  rtLogInfo("new connection from %s with fd:%d", rtSocketToString(remote_endpoint).c_str(), new_fd);
+  return rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, remote_addr);
+}
 
+rtError
+rtRemoteStreamServerEndpoint::send(int fd)
+{
+  return RT_OK;
+}
+
+rtError
+rtRemoteStreamServerEndpoint::receive(int fd)
+{
+  return RT_OK;
 }

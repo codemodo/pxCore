@@ -32,27 +32,41 @@ rtRemoteFactory::rtRemoteFactory(rtRemoteEnvironment* env)
 : m_env(env)
 , m_command_handlers()
 {
+  // empty
+  // The thought was that here we'd read in any functions specified in the config
+  // and insert them into the command handlers
 }
 
 rtRemoteFactory::~rtRemoteFactory()
 {
-  //TODO check this
-  delete m_env;
+  // empty
 }
 
-void
-rtRemoteFactory::registerFunction(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteIAddress *&))
+rtError
+rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteIAddress *&))
 {
-  m_command_handlers.insert(AddrCommandHandlerMap::value_type(scheme, func));
+  if (m_command_handlers.find(scheme) != m_command_handlers.end())
+  {
+    rtLogWarn("function for creating %s addresses already registered - use update instead", scheme.c_str());
+    return RT_FAIL;
+  }
+  m_command_handlers.insert(AddrCommandHandlerMap::value_type(scheme, f));
+  return RT_OK;
+}
+
+rtError
+rtRemoteFactory::updateFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteIAddress *&))
+{
+  m_command_handlers.insert(AddrCommandHandlerMap::value_type(scheme, f));
+  return RT_OK;
 }
 
 rtRemoteIResolver*
-rtRemoteFactory::rtRemoteCreateResolver(rtRemoteEnvironment* env)
+rtRemoteFactory::createResolver(rtRemoteEnvironment* env)
 {
   rtRemoteIResolver* resolver = nullptr;
   rtResolverType t = rtResolverTypeFromString(env->Config->resolver_type());
-  
-  t = RT_RESOLVER_FILE;
+
   switch (t)
   {
     case RT_RESOLVER_MULTICAST:
@@ -72,7 +86,7 @@ rtRemoteFactory::rtRemoteCreateResolver(rtRemoteEnvironment* env)
 }
 
 rtError
-rtRemoteFactory::rtRemoteAddressCreate(rtRemoteEnvironment* env, std::string const& uri, rtRemoteIAddress*& endpoint_addr)
+rtRemoteFactory::createAddress(std::string const& uri, rtRemoteIAddress*& endpoint_addr)
 {
   std::string scheme = uri.substr(0, uri.find(":"));
   

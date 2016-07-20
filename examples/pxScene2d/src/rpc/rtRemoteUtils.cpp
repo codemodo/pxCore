@@ -10,41 +10,45 @@
 #include <sys/types.h>
 #include <netdb.h>
 
-NetType
-rtRemoteParseNetType(std::string const& host)
+rtError
+rtRemoteParseNetType(std::string const& host, NetType& result)
 {
-  NetType result;
-
-  struct addrinfo hint, *res = NULL;
   int ret;
+  struct addrinfo hint, *res = NULL;
   memset(&hint, 0, sizeof hint);
   
   hint.ai_family = AF_UNSPEC;
   hint.ai_flags = AI_NUMERICHOST;
 
   ret = getaddrinfo(host.c_str(), NULL, &hint, &res);
-  if (ret) {
-    rtLogWarn("uri contains invalid host address format: %s", host.c_str());
-    return NetType::UNK;
+  if (ret)
+  {
+    result = NetType::UNK;
+    freeaddrinfo(res);
+    rtError e = rtErrorFromErrno(errno);
+    rtLogWarn("unable to determine NetType (network layer protocol) for host: %s", host.c_str());
+    return e;
   }
-  if(res->ai_family == AF_INET) {
-    result = NetType::IPV4;
-  } else if (res->ai_family == AF_INET6) {
-    result = NetType::IPV6;
-  } else {
-    rtLogWarn("uri contains unknown host address format: %s", host.c_str());
-    return NetType::UNK;
+  else
+  {
+    if (res->ai_family == AF_INET)
+      result = NetType::IPV4;
+    else if (res->ai_family == AF_INET6)
+      result = NetType::IPV6;
+    else
+    {
+      result = NetType::UNK;
+      freeaddrinfo(res);
+      rtLogWarn("unable to determine NetType (network layer protocol) for host: %s", host.c_str());
+      return RT_FAIL;
+    }
   }
-  freeaddrinfo(res);
-
-  return result;
+  return RT_OK;
 }
 
-CastType
-rtRemoteParseCastType(std::string const& host, NetType net_type)
+rtError
+rtRemoteParseCastType(std::string const& host, NetType const& net_type, CastType& result)
 {
-  CastType result;
-
   std::string prefix;
   if (net_type == NetType::IPV4)
   {
@@ -64,8 +68,8 @@ rtRemoteParseCastType(std::string const& host, NetType net_type)
   }
   else
    result = CastType::UNK;
-  
-  return result;       
+
+  return RT_OK;       
 }
 
 rtError
@@ -126,7 +130,7 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
   {
     strncpy(addr_buff, (const char*)addr, sizeof(addr_buff) -1);
     buff << addr_buff;
-    return createTcpAddress(buff.str(), endpoint_addr);
+    return rtRemoteCreateTcpAddress(buff.str(), endpoint_addr);
   }
   else
   {
@@ -136,13 +140,13 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
     buff << addr_buff;
     buff << ":";
     buff << port;
-    return createTcpAddress(buff.str(), endpoint_addr);
+    return rtRemoteCreateTcpAddress(buff.str(), endpoint_addr);
   }
   return RT_OK;
 }
 
 rtError
-createTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_addr)
+rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_addr)
 {
   int index;
   index = uri.find("://");
@@ -187,10 +191,11 @@ createTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_addr)
     std::string host;
     host = uri.substr(index, index_port - index);
 
-    NetType net_type = rtRemoteParseNetType(host);
-    CastType cast_type = rtRemoteParseCastType(host, net_type);
+    NetType net_type;
+    rtRemoteParseNetType(host, net_type);
+    CastType cast_type;
+    rtRemoteParseCastType(host, net_type, cast_type);
 
-    rtLogWarn("\n\nCreating address with %s, %d\n\n", host.c_str(), port);
     endpoint_addr = new rtRemoteNetAddress(scheme, host, port, net_type, cast_type);   
   }
   return RT_OK;

@@ -4,6 +4,23 @@
 #include <string>
 #include "rtRemoteTypes.h"
 #include "rtRemoteUtils.h"
+#include <sys/socket.h>
+#include <condition_variable>
+#include <map>
+#include <mutex>
+#include <string>
+#include <thread>
+
+#include <stdint.h>
+#include <netinet/in.h>
+#include <rtObject.h>
+#include <rapidjson/document.h>
+
+#include "rtRemoteIResolver.h"
+#include "rtSocketUtils.h"
+#include "rtRemoteEndpoint.h"
+
+
 
 
 /* Abstract base class for endpoint addresses */
@@ -78,41 +95,87 @@ public:
 
 
 
-
+/////////////////////////
+// Endpoint abstractions                 
+/////////////////////////
 
 class rtRemoteIEndpoint
 {
 public:
-  rtRemoteIEndpoint(rtRemoteIAddress*& addr);
+  rtRemoteIEndpoint(rtRemoteIAddress* const addr);
   virtual ~rtRemoteIEndpoint();
 
+  /* Should create fd */
   virtual rtError open() = 0;
+	virtual rtError close() = 0;
   
-  inline rtRemoteIAddress* GetEndpointAddr() const
+  inline rtRemoteIAddress* address() const
     { return m_addr; }
   
   inline int fd() const
-    { return m_listen_fd; }
+    { return m_fd; }
 
-	inline void SetFd(int fd)
-	  { m_listen_fd = fd; }
+	inline void setFd(int fd)
+	  { m_fd = fd; }
 
-	inline void SetAddr(rtRemoteIAddress* addr)
+	inline void setAddr(rtRemoteIAddress* addr)
 	  { m_addr = addr; }
 
 protected:
   rtRemoteIAddress* m_addr;
-  int m_listen_fd;
+  int m_fd;
 };
 
-class rtRemoteServerEndpoint : public rtRemoteIEndpoint
+class rtRemoteStreamEndpoint
+{
+	//TODO constructors and args for below methods
+  virtual rtError send(int fd) = 0;
+	virtual rtError receive(int fd) = 0;
+};
+
+class rtRemoteStreamServerEndpoint : public rtRemoteStreamEndpoint, public virtual rtRemoteIEndpoint
 {
 public:
-  rtRemoteServerEndpoint(rtRemoteIAddress*& addr);
-
+  rtRemoteStreamServerEndpoint(rtRemoteIAddress* const addr);
+  
   virtual rtError open() override;
-	rtError accepts(rtRemoteIAddress*& addr);
+	virtual rtError close() override;
+	virtual rtError send(int fd) override;
+	virtual rtError receive(int fd) override;
+	rtError doBind();
+	rtError doListen();
+	rtError doAccept(int& new_fd, rtRemoteIAddress*& remote_addr);
+
+	inline sockaddr_storage sockaddr() const
+	  { return m_socket; }
+
+	sockaddr_storage m_socket;
 };
+
+class rtRemoteStreamClientEndpoint : public virtual rtRemoteIEndpoint
+{
+public:
+  //rtRemoteStreamClientEndpoint(rtRemoteIAddress* const addr);
+	virtual rtError open() override;
+	virtual rtError close() override;
+};
+
+class rtRemoteDatagramServerEndpoint : public virtual rtRemoteIEndpoint
+{
+public:
+  //rtRemoteDatagramServerEndpoint(rtRemoteIAddress* const addr);
+	virtual rtError open() override;
+	virtual rtError close() override;
+};
+
+class rtRemoteDatagramClientEndpoint : public virtual rtRemoteIEndpoint
+{
+public:
+  //rtRemoteDatagramServerEndpoint(rtRemoteIAddress* const addr);
+	virtual rtError open() override;
+	virtual rtError close() override;
+};
+
 
 #endif
 
