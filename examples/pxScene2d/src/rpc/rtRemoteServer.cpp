@@ -322,11 +322,13 @@ rtRemoteServer::runListener()
     if (FD_ISSET(m_srv_endpoint->fd(), &read_fds))
       //doAccept(m_srv_endpoint->fd());
     {
-        rtRemoteIAddress* peer_addr;
-  int new_fd;
-  m_srv_endpoint->doAccept(new_fd, peer_addr);
   sockaddr_storage remote_endpoint;
-  rtError err = rtRemoteEndpointAddressToSocket(peer_addr, remote_endpoint);
+  memset(&remote_endpoint, 0, sizeof(remote_endpoint));
+  rtRemoteIAddress* peer_addr;
+  int new_fd;
+  m_srv_endpoint->doAccept(new_fd, remote_endpoint);
+  //sockaddr_storage remote_endpoint;
+  //rtError err = rtRemoteEndpointAddressToSocket(peer_addr, remote_endpoint);
 
   sockaddr_storage local_endpoint;
   memset(&local_endpoint, 0, sizeof(sockaddr_storage));

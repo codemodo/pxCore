@@ -214,6 +214,26 @@ rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteIAddress*& remote_ad
 }
 
 rtError
+rtRemoteStreamServerEndpoint::doAccept(int& new_fd, sockaddr_storage& remote_endpoint)
+{
+
+
+  socklen_t len = sizeof(sockaddr_storage);
+
+  new_fd = accept(m_fd, (struct sockaddr*)(&remote_endpoint), &len);
+
+  if (new_fd == -1)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogWarn("error accepting new tcp connect. %s", rtStrError(e));
+    return RT_FAIL;
+  }
+  rtLogInfo("new connection from %s with fd:%d", rtSocketToString(remote_endpoint).c_str(), new_fd);
+  return RT_OK;
+  //return rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, remote_addr);
+}
+
+rtError
 rtRemoteStreamServerEndpoint::send(int fd)
 {
   return RT_OK;

@@ -145,6 +145,7 @@ public:
 	rtError doBind();
 	rtError doListen();
 	rtError doAccept(int& new_fd, rtRemoteIAddress*& remote_addr);
+	rtError doAccept(int& new_fd, sockaddr_storage& remote_addr);
 
 	inline sockaddr_storage sockaddr() const
 	  { return m_socket; }
