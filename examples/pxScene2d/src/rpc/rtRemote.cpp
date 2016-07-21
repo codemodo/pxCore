@@ -22,9 +22,9 @@ rtRemoteEnvironment::rtRemoteEnvironment(rtRemoteConfig* config)
   , Server(nullptr)
   , ObjectCache(nullptr)
   , StreamSelector(nullptr)
+  , Factory(nullptr)
   , RefCount(1)
   , Initialized(false)
-  , Factory(nullptr)
 {
   StreamSelector = new rtRemoteStreamSelector();
   StreamSelector->start();

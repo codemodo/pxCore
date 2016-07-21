@@ -10,6 +10,11 @@
 #include <sys/types.h>
 #include <netdb.h>
 
+
+//TODO Maybe remove CastType and NetType from rtRemoteIAddress
+//     and instead have free functions here that parse those
+//     given an address object
+
 rtError
 rtRemoteParseNetType(std::string const& host, NetType& result)
 {
@@ -96,6 +101,7 @@ rtRemoteEndpointAddressToSocket(rtRemoteIAddress*& addr, sockaddr_storage& ss)
   }
 }
 
+//TODO Better error handling here
 rtError
 rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress*& endpoint_addr)
 {
@@ -145,10 +151,11 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
   return RT_OK;
 }
 
+//TODO Better error handling here
 rtError
 rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_addr)
 {
-  int index;
+  size_t index;
   index = uri.find("://");
   if (index == std::string::npos)
   {
@@ -182,7 +189,7 @@ rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_add
   {
     // network socket
     std::string port_string;
-    int index_port = uri.find_last_of(":");
+    size_t index_port = uri.find_last_of(":");
     port_string = uri.substr(index_port+1, std::string::npos);
     int port = stoi(port_string);
     // TODO should check to make sure previous char wasn't also a colon

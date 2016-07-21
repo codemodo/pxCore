@@ -103,8 +103,8 @@ rtRemoteDistributedAddress::toUri()
 /////////////////////////
 
 rtRemoteIEndpoint::rtRemoteIEndpoint(rtRemoteIAddress* const addr)
-: m_fd(-1)
-, m_addr(addr)
+: m_addr(addr)
+, m_fd(-1)
 {
   // empty
 }
@@ -122,8 +122,15 @@ rtRemoteStreamServerEndpoint::rtRemoteStreamServerEndpoint(rtRemoteIAddress* con
 rtError
 rtRemoteStreamServerEndpoint::open()
 {
-  int ret;
-  rtError err = rtRemoteEndpointAddressToSocket(m_addr, m_socket);
+  // TODO this should prob go in constructor, but need to throw exception in that case
+  rtError e = rtRemoteEndpointAddressToSocket(m_addr, m_socket);
+  if (e != RT_OK)
+  {
+    rtLogError("failed to convert from endpoint address to sockaddr");
+    return e;
+  }
+  
+  // open socket
   m_fd = socket(m_socket.ss_family, SOCK_STREAM, 0);
   if (m_fd < 0)
   {
@@ -191,6 +198,7 @@ rtRemoteStreamServerEndpoint::doListen()
     rtLogError("failed to put socket in listen mode. %s", rtStrError(e));
     return e;
   }
+  return RT_OK;
 }
 
 rtError
@@ -234,13 +242,13 @@ rtRemoteStreamServerEndpoint::doAccept(int& new_fd, sockaddr_storage& remote_end
 }
 
 rtError
-rtRemoteStreamServerEndpoint::send(int fd)
+rtRemoteStreamServerEndpoint::send(int /*fd*/)
 {
   return RT_OK;
 }
 
 rtError
-rtRemoteStreamServerEndpoint::receive(int fd)
+rtRemoteStreamServerEndpoint::receive(int /*fd*/)
 {
   return RT_OK;
 }
