@@ -28,6 +28,7 @@
 #define kFieldNameKeepAliveIds "keep_alive.ids"
 #define kFieldNameIp "ip"
 #define kFieldNamePort "port"
+#define kFieldNameScheme "scheme"
 
 #define kMessageTypeInvalidResponse "invalid.response"
 #define kMessageTypeSetByNameRequest "set.byname.request"

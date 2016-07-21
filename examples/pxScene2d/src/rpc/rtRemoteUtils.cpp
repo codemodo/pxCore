@@ -9,6 +9,12 @@
 #include <netinet/tcp.h>
 #include <sys/types.h>
 #include <netdb.h>
+#include <exception>
+
+
+//TODO Maybe remove CastType and NetType from rtRemoteIAddress
+//     and instead have free functions here that parse those
+//     given an address object
 
 rtError
 rtRemoteParseNetType(std::string const& host, NetType& result)
@@ -73,31 +79,57 @@ rtRemoteParseCastType(std::string const& host, NetType const& net_type, CastType
 }
 
 rtError
-rtRemoteEndpointAddressToSocket(rtRemoteIAddress*& addr, sockaddr_storage& ss)
+rtRemoteEndpointAddressToSocket(rtRemoteIAddress const& addr, sockaddr_storage& ss)
 {
-  if (dynamic_cast<rtRemoteLocalAddress*>(addr) != nullptr)
+  try
   {
-    rtRemoteLocalAddress* tmp = dynamic_cast<rtRemoteLocalAddress*>(addr);
-    if (!tmp->isSocket())
+    rtRemoteLocalAddress const& tmp = dynamic_cast<rtRemoteLocalAddress const&>(addr);
+    if (!tmp.isSocket())
     {
       rtLogError("local address is not unix domain socket");
       return RT_FAIL;
     }
-    return rtParseAddress(ss, tmp->path().c_str(), 0, nullptr);
+    return rtParseAddress(ss, tmp.path().c_str(), 0, nullptr);
   }
-  else if (dynamic_cast<rtRemoteNetAddress*>(addr) != nullptr)
+  catch (const std::bad_cast& e)
   {
-    rtRemoteNetAddress* tmp = dynamic_cast<rtRemoteNetAddress*>(addr);
-    return rtParseAddress(ss,tmp->host().c_str(), tmp->port(), nullptr);
+    try
+    {
+      rtRemoteNetAddress const& tmp = dynamic_cast<rtRemoteNetAddress const&>(addr);
+      return rtParseAddress(ss,tmp.host().c_str(), tmp.port(), nullptr);
+    }
+    catch (const std::bad_cast& e)
+    {
+      return RT_FAIL;
+    }
   }
-  else
-  {
-    return RT_FAIL;
-  }
+  return RT_FAIL;
+
+
+  // if (dynamic_cast<rtRemoteLocalAddress*>(&addr) != nullptr)
+  // {
+  //   rtRemoteLocalAddress tmp = dynamic_cast<rtRemoteLocalAddress>(addr);
+  //   if (!tmp->isSocket())
+  //   {
+  //     rtLogError("local address is not unix domain socket");
+  //     return RT_FAIL;
+  //   }
+  //   return rtParseAddress(ss, tmp->path().c_str(), 0, nullptr);
+  // }
+  // else if (dynamic_cast<rtRemoteNetAddress*>(&addr) != nullptr)
+  // {
+  //   rtRemoteNetAddress tmp = dynamic_cast<rtRemoteNetAddress>(addr);
+  //   return rtParseAddress(ss,tmp->host().c_str(), tmp->port(), nullptr);
+  // }
+  // else
+  // {
+  //   return RT_FAIL;
+  // }
 }
 
+//TODO Better error handling here
 rtError
-rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress*& endpoint_addr)
+rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress& endpoint_addr)
 {
   std::stringstream buff;
   
@@ -125,12 +157,13 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
   char addr_buff[128];
   memset(addr_buff, 0, sizeof(addr_buff));
 
-  // TODO need to figure out env thing
   if (ss.ss_family == AF_UNIX)
   {
     strncpy(addr_buff, (const char*)addr, sizeof(addr_buff) -1);
     buff << addr_buff;
-    return rtRemoteCreateTcpAddress(buff.str(), endpoint_addr);
+    rtRemoteLocalAddress local_addr(scheme, addr_buff);
+    endpoint_addr = local_addr;
+    return RT_OK;
   }
   else
   {
@@ -140,15 +173,18 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
     buff << addr_buff;
     buff << ":";
     buff << port;
-    return rtRemoteCreateTcpAddress(buff.str(), endpoint_addr);
+    rtRemoteNetAddress net_addr(scheme, addr_buff, port);
+    endpoint_addr = net_addr;
+    return RT_OK;
   }
   return RT_OK;
 }
 
+//TODO Better error handling here
 rtError
 rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_addr)
 {
-  int index;
+  size_t index;
   index = uri.find("://");
   if (index == std::string::npos)
   {
@@ -182,7 +218,7 @@ rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_add
   {
     // network socket
     std::string port_string;
-    int index_port = uri.find_last_of(":");
+    size_t index_port = uri.find_last_of(":");
     port_string = uri.substr(index_port+1, std::string::npos);
     int port = stoi(port_string);
     // TODO should check to make sure previous char wasn't also a colon

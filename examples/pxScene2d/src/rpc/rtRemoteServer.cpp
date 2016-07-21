@@ -272,7 +272,7 @@ rtRemoteServer::registerObject(std::string const& name, rtObjectRef const& obj)
   // rtRemoteIAddress* tmp;
   // rtRemoteSocketToEndpointAddress(m_srv_endpoint->sockaddr(), ConnType::STREAM, tmp);
   // rtRemoteNetAddress* tmp2 = dynamic_cast<rtRemoteNetAddress*>(tmp); 
-  m_resolver->registerObject(name, m_srv_endpoint->sockaddr());
+  m_resolver->registerObject(name, *m_rpc_endpoint);
   return RT_OK;
 }
 
@@ -324,7 +324,7 @@ rtRemoteServer::runListener()
     {
   sockaddr_storage remote_endpoint;
   memset(&remote_endpoint, 0, sizeof(remote_endpoint));
-  rtRemoteIAddress* peer_addr;
+  //rtRemoteIAddress* peer_addr;
   int new_fd;
   m_srv_endpoint->doAccept(new_fd, remote_endpoint);
   //sockaddr_storage remote_endpoint;
@@ -357,7 +357,7 @@ rtRemoteServer::doAccept(int fd)
   int new_fd;
   m_srv_endpoint->doAccept(new_fd, peer_addr);
   sockaddr_storage remote_endpoint;
-  rtError err = rtRemoteEndpointAddressToSocket(peer_addr, remote_endpoint);
+  rtRemoteEndpointAddressToSocket(*peer_addr, remote_endpoint);
 
   sockaddr_storage local_endpoint;
   memset(&local_endpoint, 0, sizeof(sockaddr_storage));
@@ -401,7 +401,7 @@ rtRemoteServer::processMessage(std::shared_ptr<rtRemoteClient>& client, rtJsonDo
 rtError
 rtRemoteServer::start()
 {
-  rtError err = m_resolver->open(m_srv_endpoint->sockaddr());
+  rtError err = m_resolver->open(*m_rpc_endpoint);
   if (err != RT_OK)
   {
     rtLogWarn("failed to open resolver. %s", rtStrError(err));
@@ -431,7 +431,8 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
   if (!obj)
   {
     sockaddr_storage rpc_endpoint;
-    err = m_resolver->locateObject(name, rpc_endpoint, timeout);
+    err = m_resolver->locateObject(name, *m_rpc_endpoint, timeout);
+    rtRemoteEndpointAddressToSocket(*m_rpc_endpoint, rpc_endpoint);
 
     rtLogDebug("object %s found at endpoint: %s", name.c_str(),
       rtSocketToString(rpc_endpoint).c_str());
@@ -523,12 +524,9 @@ rtRemoteServer::openRpcListener()
     rtGetDefaultInterface(m_rpc_socket, 0);
   }
 
-  // socketToEndpoint
+  // need to clean this up
   std::stringstream uri_buff;
   uri_buff << "tcp://";
-  // std::string tmp = rtSocketToString(m_rpc_socket);
-  // tmp = tmp.substr(tmp.find(:) + 1, std::string::npos);
-  // uri_buff << tmp;
   void* addr = nullptr;
   char buff[128];
   rtGetInetAddr(m_rpc_socket, &addr);
@@ -546,7 +544,7 @@ rtRemoteServer::openRpcListener()
       uri_buff << p;
     else
     {
-      rtLogError("failed to create endpoint");
+      rtLogError("failed to get ip information for endpoint address");
       return RT_FAIL;
     }
     uint16_t port;
@@ -554,12 +552,36 @@ rtRemoteServer::openRpcListener()
     uri_buff << ":";
     uri_buff << port;
   }
+  // end
   
-  rtError err = m_env->Factory->createAddress(uri_buff.str(), m_rpc_endpoint);
+  rtError e = m_env->Factory->createAddress(uri_buff.str(), m_rpc_endpoint);
+  if (e != RT_OK)
+  {
+    rtLogError("failed to create endpoint address for server");
+    return e;
+  }
   m_srv_endpoint = new rtRemoteStreamServerEndpoint(m_rpc_endpoint);
-  err = m_srv_endpoint->open();
-  err = m_srv_endpoint->doBind();
-  err = m_srv_endpoint->doListen();
+
+  e = m_srv_endpoint->open();
+  if (e != RT_OK)
+  {
+    rtLogError("failed to open server endpoint");
+    return e;
+  }
+
+  e = m_srv_endpoint->doBind();
+  if (e != RT_OK)
+  {
+    rtLogError("failed to bind server endpoint");
+    return e;
+  }
+
+  e = m_srv_endpoint->doListen();
+  if (e != RT_OK)
+  {
+    rtLogError("failed to begin listening on server endpoint");
+    return e;
+  }
 
   return RT_OK;
 }
@@ -571,7 +593,6 @@ rtRemoteServer::onOpenSession(std::shared_ptr<rtRemoteClient>& client, rtJsonDoc
   char const* id = rtMessage_GetObjectId(*req);
 
   #if 0
-
   std::unique_lock<std::mutex> lock(m_mutex);
   auto itr = m_objects.find(id);
   if (itr != m_objects.end())

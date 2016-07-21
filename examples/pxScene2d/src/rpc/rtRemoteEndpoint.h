@@ -47,7 +47,7 @@ public:
 	
 	virtual std::string toUri() override;
 
-	bool isSocket();
+	bool isSocket() const;
 
 	inline std::string path() const
 	  { return m_path; }
@@ -102,15 +102,14 @@ public:
 class rtRemoteIEndpoint
 {
 public:
-  rtRemoteIEndpoint(rtRemoteIAddress* const addr);
   virtual ~rtRemoteIEndpoint();
 
   /* Should create fd */
   virtual rtError open() = 0;
 	virtual rtError close() = 0;
   
-  inline rtRemoteIAddress* address() const
-    { return m_addr; }
+  // inline rtRemoteIAddress address() const
+  //   { return *m_addr; }
   
   inline int fd() const
     { return m_fd; }
@@ -118,11 +117,9 @@ public:
 	inline void setFd(int fd)
 	  { m_fd = fd; }
 
-	inline void setAddr(rtRemoteIAddress* addr)
-	  { m_addr = addr; }
-
 protected:
-  rtRemoteIAddress* m_addr;
+  rtRemoteIEndpoint(const rtRemoteIAddress* const ep_addr);
+  const rtRemoteIAddress* const m_addr;
   int m_fd;
 };
 
@@ -136,7 +133,7 @@ class rtRemoteStreamEndpoint
 class rtRemoteStreamServerEndpoint : public rtRemoteStreamEndpoint, public virtual rtRemoteIEndpoint
 {
 public:
-  rtRemoteStreamServerEndpoint(rtRemoteIAddress* const addr);
+  rtRemoteStreamServerEndpoint(const rtRemoteIAddress* const ep_addr);
   
   virtual rtError open() override;
 	virtual rtError close() override;

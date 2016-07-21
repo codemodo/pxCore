@@ -59,8 +59,10 @@ rtRemoteNsResolver::~rtRemoteNsResolver()
 }
 
 rtError
-rtRemoteNsResolver::open(sockaddr_storage const& rpc_endpoint)
+rtRemoteNsResolver::open(rtRemoteIAddress const& endpoint_address)
 {
+  sockaddr_storage rpc_endpoint;
+  rtRemoteEndpointAddressToSocket(endpoint_address, rpc_endpoint);
   char buff[128];
   void* addr = nullptr;
   rtGetInetAddr(rpc_endpoint, &addr);
@@ -92,19 +94,22 @@ rtRemoteNsResolver::open(sockaddr_storage const& rpc_endpoint)
 }
 
 rtError
-rtRemoteNsResolver::registerObject(std::string const& name, sockaddr_storage const& endpoint)
+rtRemoteNsResolver::registerObject(std::string const& name, rtRemoteIAddress const& endpoint_address)
 {
-    return registerObject(name, endpoint, 3000);
+    return registerObject(name, endpoint_address, 3000);
 }
 
 rtError
-rtRemoteNsResolver::registerObject(std::string const& name, sockaddr_storage const& endpoint, uint32_t timeout)
+rtRemoteNsResolver::registerObject(std::string const& name, rtRemoteIAddress const& endpoint_address, uint32_t timeout)
 {
   if (m_static_fd == -1)
   {
     rtLogError("unicast socket not opened");
     return RT_FAIL;
   }
+
+  sockaddr_storage endpoint;
+  rtRemoteEndpointAddressToSocket(endpoint_address, endpoint);
 
   std::string rpc_addr;
   uint16_t rpc_port;
@@ -186,7 +191,7 @@ rtRemoteNsResolver::registerObject(std::string const& name, sockaddr_storage con
 }
 
 rtError
-rtRemoteNsResolver::locateObject(std::string const& name, sockaddr_storage& endpoint,
+rtRemoteNsResolver::locateObject(std::string const& name, rtRemoteIAddress& endpoint_address,
     uint32_t timeout)
 {
   if (m_static_fd == -1)
@@ -252,11 +257,18 @@ rtRemoteNsResolver::locateObject(std::string const& name, sockaddr_storage& endp
       {
         RT_ASSERT(searchResponse->HasMember(kFieldNameIp));
         RT_ASSERT(searchResponse->HasMember(kFieldNamePort));
-        rtError err = rtParseAddress(endpoint, (*searchResponse)[kFieldNameIp].GetString(),
-          (*searchResponse)[kFieldNamePort].GetInt(), nullptr);
+        RT_ASSERT(searchResponse->HasMember(kFieldNameScheme));
+
+        // rtError err = rtParseAddress(endpoint, (*searchResponse)[kFieldNameIp].GetString(),
+        //   (*searchResponse)[kFieldNamePort].GetInt(), nullptr);
         
-        if (err != RT_OK)
-          return err;
+        // if (err != RT_OK)
+        //   return err;
+        rtRemoteNetAddress net_address( (*searchResponse)[kFieldNameScheme].GetString()
+                                      , (*searchResponse)[kFieldNameIp].GetString()
+                                      , (*searchResponse)[kFieldNamePort].GetInt()
+                                      );
+        endpoint_address = net_address;
       }
     }
     else

@@ -21,10 +21,10 @@ public:
   ~rtRemoteMulticastResolver();
 
 public:
-  virtual rtError open(sockaddr_storage const& rpc_endpoint) override;
+  virtual rtError open(rtRemoteIAddress const& endpoint_address) override;
   virtual rtError close() override;
-  virtual rtError registerObject(std::string const& name, sockaddr_storage const& endpoint) override;
-  virtual rtError locateObject(std::string const& name, sockaddr_storage& endpoint,
+  virtual rtError registerObject(std::string const& name, rtRemoteIAddress const& endpoint_address) override;
+  virtual rtError locateObject(std::string const& name, rtRemoteIAddress& endpoint_address,
     uint32_t timeout) override;
 
 private:

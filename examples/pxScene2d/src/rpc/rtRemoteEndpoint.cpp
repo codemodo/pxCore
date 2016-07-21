@@ -32,7 +32,7 @@ rtRemoteLocalAddress::rtRemoteLocalAddress(std::string const& scheme, std::strin
 { }
 
 bool
-rtRemoteLocalAddress::isSocket()
+rtRemoteLocalAddress::isSocket() const
 {
   return m_scheme.compare("tcp") == 0 || m_scheme.compare("udp") == 0;
 }
@@ -102,9 +102,9 @@ rtRemoteDistributedAddress::toUri()
 // Endpoint abstractions                 
 /////////////////////////
 
-rtRemoteIEndpoint::rtRemoteIEndpoint(rtRemoteIAddress* const addr)
-: m_fd(-1)
-, m_addr(addr)
+rtRemoteIEndpoint::rtRemoteIEndpoint(const rtRemoteIAddress* const ep_addr)
+: m_addr(ep_addr)
+, m_fd(-1)
 {
   // empty
 }
@@ -113,7 +113,7 @@ rtRemoteIEndpoint::~rtRemoteIEndpoint()
 {
 }
 
-rtRemoteStreamServerEndpoint::rtRemoteStreamServerEndpoint(rtRemoteIAddress* const addr)
+rtRemoteStreamServerEndpoint::rtRemoteStreamServerEndpoint(const rtRemoteIAddress* const addr)
 : rtRemoteIEndpoint(addr)
 {
   memset(&m_socket, 0, sizeof(sockaddr_storage));
@@ -122,8 +122,15 @@ rtRemoteStreamServerEndpoint::rtRemoteStreamServerEndpoint(rtRemoteIAddress* con
 rtError
 rtRemoteStreamServerEndpoint::open()
 {
-  int ret;
-  rtError err = rtRemoteEndpointAddressToSocket(m_addr, m_socket);
+  // TODO this should prob go in constructor, but need to throw exception in that case
+  rtError e = rtRemoteEndpointAddressToSocket(*m_addr, m_socket);
+  if (e != RT_OK)
+  {
+    rtLogError("failed to convert from endpoint address to sockaddr");
+    return e;
+  }
+  
+  // open socket
   m_fd = socket(m_socket.ss_family, SOCK_STREAM, 0);
   if (m_fd < 0)
   {
@@ -191,6 +198,7 @@ rtRemoteStreamServerEndpoint::doListen()
     rtLogError("failed to put socket in listen mode. %s", rtStrError(e));
     return e;
   }
+  return RT_OK;
 }
 
 rtError
@@ -210,7 +218,7 @@ rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteIAddress*& remote_ad
     return RT_FAIL;
   }
   rtLogInfo("new connection from %s with fd:%d", rtSocketToString(remote_endpoint).c_str(), new_fd);
-  return rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, remote_addr);
+  return rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, *remote_addr);
 }
 
 rtError
@@ -234,13 +242,13 @@ rtRemoteStreamServerEndpoint::doAccept(int& new_fd, sockaddr_storage& remote_end
 }
 
 rtError
-rtRemoteStreamServerEndpoint::send(int fd)
+rtRemoteStreamServerEndpoint::send(int /*fd*/)
 {
   return RT_OK;
 }
 
 rtError
-rtRemoteStreamServerEndpoint::receive(int fd)
+rtRemoteStreamServerEndpoint::receive(int /*fd*/)
 {
   return RT_OK;
 }

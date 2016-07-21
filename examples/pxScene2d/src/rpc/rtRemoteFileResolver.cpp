@@ -45,8 +45,10 @@ rtRemoteFileResolver::~rtRemoteFileResolver()
 }
 
 rtError
-rtRemoteFileResolver::open(sockaddr_storage const& rpc_endpoint)
+rtRemoteFileResolver::open(rtRemoteIAddress const& endpoint_address)
 {
+  sockaddr_storage rpc_endpoint;
+  rtRemoteEndpointAddressToSocket(endpoint_address, rpc_endpoint);
   std::string dbPath = m_env->Config->resolver_file_db_path();
   m_db_fp = fopen(dbPath.c_str(), "r+");
   if (m_db_fp == nullptr)
@@ -71,7 +73,7 @@ rtRemoteFileResolver::open(sockaddr_storage const& rpc_endpoint)
 }
 
 rtError
-rtRemoteFileResolver::registerObject(std::string const& name, sockaddr_storage const&)
+rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteIAddress const&)
 {
   if (m_db_fp == nullptr)
   {
@@ -105,7 +107,7 @@ rtRemoteFileResolver::registerObject(std::string const& name, sockaddr_storage c
 }
 
 rtError
-rtRemoteFileResolver::locateObject(std::string const& name, sockaddr_storage& endpoint,
+rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteIAddress& endpoint_address,
     uint32_t)
 {
   if (m_db_fp == nullptr)
@@ -128,11 +130,15 @@ rtRemoteFileResolver::locateObject(std::string const& name, sockaddr_storage& en
     return RT_FAIL;
   
   // pull registered IP and port
+  rapidjson::Value *scheme = rapidjson::Pointer("/" + name + "/" + kFieldNameScheme).Get(doc);
   rapidjson::Value *ip = rapidjson::Pointer("/" + name + "/" + kFieldNameIp).Get(doc);
   rapidjson::Value *port = rapidjson::Pointer("/" + name + "/" + kFieldNamePort).Get(doc);
-  rtError err = rtParseAddress(endpoint, ip->GetString(), port->GetInt(), nullptr);
-  if (err != RT_OK)
-    return err;
+  // rtError err = rtParseAddress(endpoint, ip->GetString(), port->GetInt(), nullptr);
+  // if (err != RT_OK)
+  //   return err;
+
+  rtRemoteNetAddress net_addr(scheme->GetString(), ip->GetString(), port->GetInt());
+  endpoint_address = net_addr;
     
   return RT_OK;
 }
