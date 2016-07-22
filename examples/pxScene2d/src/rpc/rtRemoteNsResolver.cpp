@@ -191,7 +191,7 @@ rtRemoteNsResolver::registerObject(std::string const& name, rtRemoteIAddress con
 }
 
 rtError
-rtRemoteNsResolver::locateObject(std::string const& name, rtRemoteIAddress& endpoint_address,
+rtRemoteNsResolver::locateObject(std::string const& name, rtRemoteIAddress*& endpoint_address,
     uint32_t timeout)
 {
   if (m_static_fd == -1)
@@ -264,11 +264,9 @@ rtRemoteNsResolver::locateObject(std::string const& name, rtRemoteIAddress& endp
         
         // if (err != RT_OK)
         //   return err;
-        rtRemoteNetAddress net_address( (*searchResponse)[kFieldNameScheme].GetString()
-                                      , (*searchResponse)[kFieldNameIp].GetString()
-                                      , (*searchResponse)[kFieldNamePort].GetInt()
-                                      );
-        endpoint_address = net_address;
+    endpoint_address = new rtRemoteLocalAddress( (*searchResponse)[kFieldNameScheme].GetString()
+                                  , (*searchResponse)[kFieldNameIp].GetString()
+                                  );
       }
     }
     else

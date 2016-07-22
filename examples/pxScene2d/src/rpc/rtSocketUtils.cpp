@@ -18,6 +18,9 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
+#include "rtRemoteEndpoint.h"
+#include "rtRemoteTypes.h"
+
 #ifndef RT_REMOTE_LOOPBACK_ONLY
 static rtError
 rtFindFirstInetInterface(char* name, size_t len)
@@ -321,13 +324,17 @@ rtSendDocument(rapidjson::Document const& doc, int fd, sockaddr_storage const* d
   rapidjson::Writer<rapidjson::StringBuffer> writer(buff);
   doc.Accept(writer);
 
-  #ifdef RT_RPC_DEBUG
   sockaddr_storage remote_endpoint;
   memset(&remote_endpoint, 0, sizeof(sockaddr_storage));
+  #ifdef RT_RPC_DEBUG
   if (dest)
+  {
     remote_endpoint = *dest;
+  }
   else
+  {
     rtGetPeerName(fd, remote_endpoint);
+  }
 
   char const* verb = (dest != NULL ? "sendto" : "send");
   rtLogDebug("%s [%d/%s] (%d):\n***OUT***\t\"%.*s\"\n",
@@ -338,9 +345,17 @@ rtSendDocument(rapidjson::Document const& doc, int fd, sockaddr_storage const* d
     static_cast<int>(buff.GetSize()),
     buff.GetString());
   #endif
-
+ 
   if (dest)
   {
+    // remote_endpoint = *dest;
+    // rtRemoteIAddress* tmp;
+    // rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, *tmp);
+    // rtLogWarn("\n\ntrying to send to: %s", tmp->toUri().c_str());
+
+    rtLogWarn("\n\n\nsending to. dest:%s family:%d", rtSocketToString(*dest).c_str(),
+        dest->ss_family);
+    
     socklen_t len;
     rtSocketGetLength(*dest, &len);
 
@@ -360,6 +375,13 @@ rtSendDocument(rapidjson::Document const& doc, int fd, sockaddr_storage const* d
   }
   else
   {
+    rtGetPeerName(fd, remote_endpoint);
+    rtLogWarn("\n\n\nsending to. dest:%s family:%d", rtSocketToString(remote_endpoint).c_str(),
+        remote_endpoint.ss_family);
+    // rtRemoteIAddress* tmp;
+    // rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, *tmp);
+    // rtLogWarn("\n\ntrying to send to: %s", tmp->toUri().c_str());
+
     // send length first
     int n = buff.GetSize();
     n = htonl(n);

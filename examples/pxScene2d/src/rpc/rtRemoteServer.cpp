@@ -269,9 +269,6 @@ rtRemoteServer::registerObject(std::string const& name, rtObjectRef const& obj)
   rtObjectRef ref = m_env->ObjectCache->findObject(name);
   if (!ref)
     m_env->ObjectCache->insert(name, obj, -1);
-  // rtRemoteIAddress* tmp;
-  // rtRemoteSocketToEndpointAddress(m_srv_endpoint->sockaddr(), ConnType::STREAM, tmp);
-  // rtRemoteNetAddress* tmp2 = dynamic_cast<rtRemoteNetAddress*>(tmp); 
   m_resolver->registerObject(name, *m_rpc_endpoint);
   return RT_OK;
 }
@@ -431,8 +428,9 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
   if (!obj)
   {
     sockaddr_storage rpc_endpoint;
-    err = m_resolver->locateObject(name, *m_rpc_endpoint, timeout);
-    rtRemoteEndpointAddressToSocket(*m_rpc_endpoint, rpc_endpoint);
+    rtRemoteIAddress* obj_addr;
+    err = m_resolver->locateObject(name, obj_addr, timeout);
+    rtRemoteEndpointAddressToSocket(*obj_addr, rpc_endpoint);
 
     rtLogDebug("object %s found at endpoint: %s", name.c_str(),
       rtSocketToString(rpc_endpoint).c_str());

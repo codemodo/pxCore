@@ -107,7 +107,7 @@ rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteIAddress c
 }
 
 rtError
-rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteIAddress& endpoint_address,
+rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteIAddress*& endpoint_address,
     uint32_t)
 {
   if (m_db_fp == nullptr)
@@ -137,8 +137,9 @@ rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteIAddress& en
   // if (err != RT_OK)
   //   return err;
 
-  rtRemoteNetAddress net_addr(scheme->GetString(), ip->GetString(), port->GetInt());
-  endpoint_address = net_addr;
+    endpoint_address = new rtRemoteLocalAddress( scheme->GetString()
+                                  , ip->GetString()
+                                  );
     
   return RT_OK;
 }

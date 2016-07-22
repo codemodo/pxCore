@@ -224,8 +224,6 @@ rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteIAddress*& remote_ad
 rtError
 rtRemoteStreamServerEndpoint::doAccept(int& new_fd, sockaddr_storage& remote_endpoint)
 {
-
-
   socklen_t len = sizeof(sockaddr_storage);
 
   new_fd = accept(m_fd, (struct sockaddr*)(&remote_endpoint), &len);

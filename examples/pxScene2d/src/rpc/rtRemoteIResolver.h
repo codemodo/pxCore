@@ -20,7 +20,7 @@ public:
   virtual rtError open(rtRemoteIAddress const& endpoint_address) = 0;
   virtual rtError close() = 0;
   virtual rtError registerObject(std::string const& name, rtRemoteIAddress const& endpoint_address) = 0;
-  virtual rtError locateObject(std::string const& name, rtRemoteIAddress& endpoint_address, uint32_t timeout) = 0;
+  virtual rtError locateObject(std::string const& name, rtRemoteIAddress*& endpoint_address, uint32_t timeout) = 0;
 };
 
 #endif

@@ -338,6 +338,7 @@ rtRemoteMulticastResolver::onSearch(rtJsonDocPtr const& doc, sockaddr_storage co
     doc.AddMember(kFieldNameScheme, "tcp", doc.GetAllocator());
     doc.AddMember(kFieldNameIp, m_rpc_addr, doc.GetAllocator());
     doc.AddMember(kFieldNamePort, m_rpc_port, doc.GetAllocator());
+    rtLogWarn("\n\n\nSending address as %s:%d", m_rpc_addr.c_str(), m_rpc_port);
     // echo kback to sender
     doc.AddMember(kFieldNameSenderId, senderId->value.GetInt(), doc.GetAllocator());
     doc.AddMember(kFieldNameCorrelationKey, key, doc.GetAllocator());
@@ -362,7 +363,7 @@ rtRemoteMulticastResolver::onLocate(rtJsonDocPtr const& doc, sockaddr_storage co
 }
 
 rtError
-rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteIAddress& endpoint_address, uint32_t timeout)
+rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteIAddress*& endpoint_address, uint32_t timeout)
 {
   if (m_ucast_fd == -1)
   {
@@ -420,12 +421,11 @@ rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteIAddres
     // if (err != RT_OK)
     //   return err;
 
-    rtRemoteNetAddress net_address( (*searchResponse)[kFieldNameScheme].GetString()
+    // rtLogWarn("\n\nThe location returned from the search is: %s:%d", 
+    // (*searchResponse)[kFieldNameIp].GetString().c_str(), (*searchResponse)[kFieldNamePort].GetInt());
+    endpoint_address = new rtRemoteLocalAddress( (*searchResponse)[kFieldNameScheme].GetString()
                                   , (*searchResponse)[kFieldNameIp].GetString()
-                                  , (*searchResponse)[kFieldNamePort].GetInt()
                                   );
-    endpoint_address = net_address;
-                                
   }
 
   return RT_OK;
