@@ -324,17 +324,16 @@ rtSendDocument(rapidjson::Document const& doc, int fd, sockaddr_storage const* d
   rapidjson::Writer<rapidjson::StringBuffer> writer(buff);
   doc.Accept(writer);
 
+  // TODO Fiuk delete
+  // sockaddr_storage remote_endpoint;
+  // memset(&remote_endpoint, 0, sizeof(sockaddr_storage));
+  #ifdef RT_RPC_DEBUG
   sockaddr_storage remote_endpoint;
   memset(&remote_endpoint, 0, sizeof(sockaddr_storage));
-  #ifdef RT_RPC_DEBUG
   if (dest)
-  {
     remote_endpoint = *dest;
-  }
   else
-  {
     rtGetPeerName(fd, remote_endpoint);
-  }
 
   char const* verb = (dest != NULL ? "sendto" : "send");
   rtLogDebug("%s [%d/%s] (%d):\n***OUT***\t\"%.*s\"\n",
@@ -348,13 +347,9 @@ rtSendDocument(rapidjson::Document const& doc, int fd, sockaddr_storage const* d
  
   if (dest)
   {
-    // remote_endpoint = *dest;
-    // rtRemoteIAddress* tmp;
-    // rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, *tmp);
-    // rtLogWarn("\n\ntrying to send to: %s", tmp->toUri().c_str());
-
-    rtLogWarn("\n\n\nsending to. dest:%s family:%d", rtSocketToString(*dest).c_str(),
-        dest->ss_family);
+    // TODO Fiuk delete
+    // rtLogWarn("\n\n\nsending to. dest:%s family:%d", rtSocketToString(*dest).c_str(),
+    //     dest->ss_family);
     
     socklen_t len;
     rtSocketGetLength(*dest, &len);
@@ -375,12 +370,10 @@ rtSendDocument(rapidjson::Document const& doc, int fd, sockaddr_storage const* d
   }
   else
   {
-    rtGetPeerName(fd, remote_endpoint);
-    rtLogWarn("\n\n\nsending to. dest:%s family:%d", rtSocketToString(remote_endpoint).c_str(),
-        remote_endpoint.ss_family);
-    // rtRemoteIAddress* tmp;
-    // rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, *tmp);
-    // rtLogWarn("\n\ntrying to send to: %s", tmp->toUri().c_str());
+    // TODO Fiuk delete
+    // rtGetPeerName(fd, remote_endpoint);
+    // rtLogWarn("\n\n\nsending to. dest:%s family:%d", rtSocketToString(remote_endpoint).c_str(),
+    //     remote_endpoint.ss_family);
 
     // send length first
     int n = buff.GetSize();

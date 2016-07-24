@@ -111,6 +111,9 @@ rtRemoteIEndpoint::rtRemoteIEndpoint(const rtRemoteIAddress* const ep_addr)
 
 rtRemoteIEndpoint::~rtRemoteIEndpoint()
 {
+  if (m_fd != -1)
+    ::close(m_fd);
+  m_fd = -1;
 }
 
 rtRemoteStreamServerEndpoint::rtRemoteStreamServerEndpoint(const rtRemoteIAddress* const addr)
@@ -122,7 +125,12 @@ rtRemoteStreamServerEndpoint::rtRemoteStreamServerEndpoint(const rtRemoteIAddres
 rtError
 rtRemoteStreamServerEndpoint::open()
 {
-  // TODO this should prob go in constructor, but need to throw exception in that case
+  if (m_addr == nullptr)
+  {
+    rtLogError("failed to open endpoint socket: endpoint address is null");
+    return RT_FAIL;
+  }
+
   rtError e = rtRemoteEndpointAddressToSocket(*m_addr, m_socket);
   if (e != RT_OK)
   {
@@ -139,6 +147,7 @@ rtRemoteStreamServerEndpoint::open()
     return e;
   }
 
+  // TODO need to abstract out options, etc.
   fcntl(m_fd, F_SETFD, fcntl(m_fd, F_GETFD) | FD_CLOEXEC);
 
   if (m_socket.ss_family != AF_UNIX)
@@ -156,6 +165,7 @@ rtRemoteStreamServerEndpoint::close()
 {
   if (m_fd != -1)
     ::close(m_fd);
+  m_fd = -1;
   return RT_OK;
 }
 
@@ -218,25 +228,7 @@ rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteIAddress*& remote_ad
     return RT_FAIL;
   }
   rtLogInfo("new connection from %s with fd:%d", rtSocketToString(remote_endpoint).c_str(), new_fd);
-  return rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, *remote_addr);
-}
-
-rtError
-rtRemoteStreamServerEndpoint::doAccept(int& new_fd, sockaddr_storage& remote_endpoint)
-{
-  socklen_t len = sizeof(sockaddr_storage);
-
-  new_fd = accept(m_fd, (struct sockaddr*)(&remote_endpoint), &len);
-
-  if (new_fd == -1)
-  {
-    rtError e = rtErrorFromErrno(errno);
-    rtLogWarn("error accepting new tcp connect. %s", rtStrError(e));
-    return RT_FAIL;
-  }
-  rtLogInfo("new connection from %s with fd:%d", rtSocketToString(remote_endpoint).c_str(), new_fd);
-  return RT_OK;
-  //return rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, remote_addr);
+  return rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, remote_addr);
 }
 
 rtError
@@ -248,5 +240,129 @@ rtRemoteStreamServerEndpoint::send(int /*fd*/)
 rtError
 rtRemoteStreamServerEndpoint::receive(int /*fd*/)
 {
+  return RT_OK;
+}
+
+rtRemoteStreamClientEndpoint::rtRemoteStreamClientEndpoint(const rtRemoteIAddress* const addr)
+: rtRemoteIEndpoint(addr)
+{
+  // TODO
+}
+
+rtError
+rtRemoteStreamClientEndpoint::open()
+{
+  // TODO
+  return RT_OK;
+}
+
+rtError
+rtRemoteStreamClientEndpoint::close()
+{
+  // TODO
+  return RT_OK;
+}
+
+rtRemoteDatagramServerEndpoint::rtRemoteDatagramServerEndpoint(const rtRemoteIAddress* const addr)
+: rtRemoteIEndpoint(addr)
+{
+  // TODO
+}
+
+rtError
+rtRemoteDatagramServerEndpoint::open()
+{
+  // TODO
+  return RT_OK;
+}
+
+rtError
+rtRemoteDatagramServerEndpoint::close()
+{
+  // TODO
+  return RT_OK;
+}
+
+
+rtRemoteDatagramClientEndpoint::rtRemoteDatagramClientEndpoint(const rtRemoteIAddress* const addr)
+: rtRemoteIEndpoint(addr)
+{
+  // TODO
+}
+
+rtError
+rtRemoteDatagramClientEndpoint::open()
+{
+  // TODO
+  return RT_OK;
+}
+
+rtError
+rtRemoteDatagramClientEndpoint::close()
+{
+  // TODO
+  return RT_OK;
+}
+
+
+rtRemoteSharedMemoryEndpoint::rtRemoteSharedMemoryEndpoint(const rtRemoteIAddress* const addr)
+: rtRemoteIEndpoint(addr)
+{
+  // TODO
+}
+
+rtError
+rtRemoteSharedMemoryEndpoint::open()
+{
+  // TODO
+  return RT_OK;
+}
+
+rtError
+rtRemoteSharedMemoryEndpoint::close()
+{
+  // TODO
+  return RT_OK;
+}
+
+
+rtRemoteFileEndpoint::rtRemoteFileEndpoint(const rtRemoteIAddress* const addr)
+: rtRemoteIEndpoint(addr)
+{
+  // TODO
+}
+
+rtError
+rtRemoteFileEndpoint::open()
+{
+  // TODO
+  return RT_OK;
+}
+
+rtError
+rtRemoteFileEndpoint::close()
+{
+  // TODO
+  return RT_OK;
+}
+
+
+rtRemoteNamedPipeEndpoint::rtRemoteNamedPipeEndpoint(const rtRemoteIAddress* const addr)
+: rtRemoteIEndpoint(addr)
+{
+  // TODO
+}
+
+rtError
+rtRemoteNamedPipeEndpoint::open()
+{
+  // TODO
+  return RT_OK;
+}
+
+rtError
+rtRemoteNamedPipeEndpoint::close()
+{
+  // TODO
   return RT_OK;
 }

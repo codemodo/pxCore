@@ -123,14 +123,14 @@ protected:
   int m_fd;
 };
 
-class rtRemoteStreamEndpoint
+class rtRemoteIStreamEndpoint
 {
 	//TODO constructors and args for below methods
   virtual rtError send(int fd) = 0;
 	virtual rtError receive(int fd) = 0;
 };
 
-class rtRemoteStreamServerEndpoint : public rtRemoteStreamEndpoint, public virtual rtRemoteIEndpoint
+class rtRemoteStreamServerEndpoint : public virtual rtRemoteIEndpoint, public rtRemoteIStreamEndpoint
 {
 public:
   rtRemoteStreamServerEndpoint(const rtRemoteIAddress* const ep_addr);
@@ -142,7 +142,6 @@ public:
 	rtError doBind();
 	rtError doListen();
 	rtError doAccept(int& new_fd, rtRemoteIAddress*& remote_addr);
-	rtError doAccept(int& new_fd, sockaddr_storage& remote_addr);
 
 	inline sockaddr_storage sockaddr() const
 	  { return m_socket; }
@@ -150,44 +149,58 @@ public:
 	sockaddr_storage m_socket;
 };
 
-class rtRemoteStreamClientEndpoint : public virtual rtRemoteIEndpoint
+class rtRemoteStreamClientEndpoint : public virtual rtRemoteIEndpoint, public rtRemoteIStreamEndpoint
 {
 public:
-  //rtRemoteStreamClientEndpoint(rtRemoteIAddress* const addr);
+  rtRemoteStreamClientEndpoint(const rtRemoteIAddress* const addr);
 	virtual rtError open() override;
 	virtual rtError close() override;
+	//virtual rtError send(int fd) override;
+	//virtual rtError receive(int fd) override;
 };
 
 class rtRemoteDatagramServerEndpoint : public virtual rtRemoteIEndpoint
 {
 public:
-  //rtRemoteDatagramServerEndpoint(rtRemoteIAddress* const addr);
+  rtRemoteDatagramServerEndpoint(const rtRemoteIAddress* const addr);
 	virtual rtError open() override;
 	virtual rtError close() override;
+  // rtError doBind();
+	// rtError doListen();
+	// rtError receive();
 };
 
 class rtRemoteDatagramClientEndpoint : public virtual rtRemoteIEndpoint
 {
 public:
-  //rtRemoteDatagramServerEndpoint(rtRemoteIAddress* const addr);
+  rtRemoteDatagramClientEndpoint(const rtRemoteIAddress* const addr);
+	virtual rtError open() override;
+	virtual rtError close() override;
+	// rtError send();
+};
+
+class rtRemoteSharedMemoryEndpoint : public virtual rtRemoteIEndpoint
+{
+public:
+  rtRemoteSharedMemoryEndpoint(const rtRemoteIAddress* const addr);
 	virtual rtError open() override;
 	virtual rtError close() override;
 };
 
+class rtRemoteFileEndpoint : public virtual rtRemoteIEndpoint
+{
+public:
+  rtRemoteFileEndpoint(const rtRemoteIAddress* const addr);
+	virtual rtError open() override;
+	virtual rtError close() override;
+};
+
+class rtRemoteNamedPipeEndpoint : public virtual rtRemoteIEndpoint
+{
+public:
+  rtRemoteNamedPipeEndpoint(const rtRemoteIAddress* const addr);
+	virtual rtError open() override;
+	virtual rtError close() override;
+};
 
 #endif
-
-// class rtRemoteILocalResource : public virtual rtRemoteIResource
-// {
-// public:
-//   rtRemoteILocalResource(rtEndpointAddr const& ep_addr);
-//   ~rtRemoteILocalResource();
-// };
-
-
-// class rtRemoteINetworkResource : public virtual rtRemoteIResource
-// {
-// public:
-//   rtRemoteINetworkResource(rtEndpointAddr const& ep_addr);
-//   ~rtRemoteINetworkResource();
-// };

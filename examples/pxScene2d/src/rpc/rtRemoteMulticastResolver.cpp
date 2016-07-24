@@ -421,8 +421,6 @@ rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteIAddres
     // if (err != RT_OK)
     //   return err;
 
-    // rtLogWarn("\n\nThe location returned from the search is: %s:%d", 
-    // (*searchResponse)[kFieldNameIp].GetString().c_str(), (*searchResponse)[kFieldNamePort].GetInt());
     endpoint_address = new rtRemoteLocalAddress( (*searchResponse)[kFieldNameScheme].GetString()
                                   , (*searchResponse)[kFieldNameIp].GetString()
                                   );

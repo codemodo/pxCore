@@ -104,32 +104,12 @@ rtRemoteEndpointAddressToSocket(rtRemoteIAddress const& addr, sockaddr_storage& 
     }
   }
   return RT_FAIL;
-
-
-  // if (dynamic_cast<rtRemoteLocalAddress*>(&addr) != nullptr)
-  // {
-  //   rtRemoteLocalAddress tmp = dynamic_cast<rtRemoteLocalAddress>(addr);
-  //   if (!tmp->isSocket())
-  //   {
-  //     rtLogError("local address is not unix domain socket");
-  //     return RT_FAIL;
-  //   }
-  //   return rtParseAddress(ss, tmp->path().c_str(), 0, nullptr);
-  // }
-  // else if (dynamic_cast<rtRemoteNetAddress*>(&addr) != nullptr)
-  // {
-  //   rtRemoteNetAddress tmp = dynamic_cast<rtRemoteNetAddress>(addr);
-  //   return rtParseAddress(ss,tmp->host().c_str(), tmp->port(), nullptr);
-  // }
-  // else
-  // {
-  //   return RT_FAIL;
-  // }
 }
 
+//TODO change this so that it doesn't need to have conn_type passed in
 //TODO Better error handling here
 rtError
-rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress& endpoint_addr)
+rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress*& endpoint_addr)
 {
   std::stringstream buff;
   
@@ -161,8 +141,7 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
   {
     strncpy(addr_buff, (const char*)addr, sizeof(addr_buff) -1);
     buff << addr_buff;
-    rtRemoteLocalAddress local_addr(scheme, addr_buff);
-    endpoint_addr = local_addr;
+    endpoint_addr = new rtRemoteLocalAddress(scheme, addr_buff);
     return RT_OK;
   }
   else
@@ -173,8 +152,7 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
     buff << addr_buff;
     buff << ":";
     buff << port;
-    rtRemoteNetAddress net_addr(scheme, addr_buff, port);
-    endpoint_addr = net_addr;
+    endpoint_addr = new rtRemoteNetAddress(scheme, addr_buff, port);
     return RT_OK;
   }
   return RT_OK;
