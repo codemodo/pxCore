@@ -28,7 +28,11 @@
 #define kFieldNameKeepAliveIds "keep_alive.ids"
 #define kFieldNameIp "ip"
 #define kFieldNamePort "port"
+#define kFieldNamePath "path"
 #define kFieldNameScheme "scheme"
+#define kFieldNameEndpointType "endpoint.type"
+#define kEndpointTypeLocal "local.endpoint"
+#define kEndpointTypeNet "net.endpoint"
 
 #define kMessageTypeInvalidResponse "invalid.response"
 #define kMessageTypeSetByNameRequest "set.byname.request"

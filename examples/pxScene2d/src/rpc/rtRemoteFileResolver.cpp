@@ -45,10 +45,8 @@ rtRemoteFileResolver::~rtRemoteFileResolver()
 }
 
 rtError
-rtRemoteFileResolver::open(rtRemoteIAddress const& endpoint_address)
+rtRemoteFileResolver::open()
 {
-  sockaddr_storage rpc_endpoint;
-  rtRemoteEndpointAddressToSocket(endpoint_address, rpc_endpoint);
   std::string dbPath = m_env->Config->resolver_file_db_path();
   m_db_fp = fopen(dbPath.c_str(), "r+");
   if (m_db_fp == nullptr)
@@ -57,23 +55,11 @@ rtRemoteFileResolver::open(rtRemoteIAddress const& endpoint_address)
     rtLogError("could not open database file %s. %s", dbPath.c_str(), rtStrError(e));
     return e;
   }
-
-  char buff[128];
-  void* addr = nullptr;
-  rtGetInetAddr(rpc_endpoint, &addr);
-
-  socklen_t len;
-  rtSocketGetLength(rpc_endpoint, &len);
-  char const* p = inet_ntop(rpc_endpoint.ss_family, addr, buff, len);
-  if (p)
-    m_rpc_addr = p;
-
-  rtGetPort(rpc_endpoint, &m_rpc_port);
   return RT_OK;
 }
 
 rtError
-rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteIAddress const&)
+rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteAddrPtr)
 {
   if (m_db_fp == nullptr)
   {
@@ -91,8 +77,9 @@ rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteIAddress c
   rapidjson::FileReadStream is(m_db_fp, readBuffer, sizeof(readBuffer));
   doc.ParseStream(is);
 
-  rapidjson::Pointer("/" + name + "/" + kFieldNameIp).Set(doc, m_rpc_addr);
-  rapidjson::Pointer("/" + name + "/" + kFieldNamePort).Set(doc, m_rpc_port);
+//TODO
+  rapidjson::Pointer("/" + name + "/" + kFieldNameIp).Set(doc, "");
+  rapidjson::Pointer("/" + name + "/" + kFieldNamePort).Set(doc, 11);
 
   // write updated json back to file
   char writeBuffer[65536];
@@ -107,7 +94,7 @@ rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteIAddress c
 }
 
 rtError
-rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteIAddress*& endpoint_address,
+rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteAddrPtr& endpoint_address,
     uint32_t)
 {
   if (m_db_fp == nullptr)
@@ -137,9 +124,10 @@ rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteIAddress*& e
   // if (err != RT_OK)
   //   return err;
 
-    endpoint_address = new rtRemoteLocalAddress( scheme->GetString()
-                                  , ip->GetString()
-                                  );
+    // endpoint_address = new rtRemoteLocalAddress( scheme->GetString()
+    //                               , ip->GetString()
+    //                               );
+    endpoint_address = std::make_shared<rtRemoteLocalAddress>("", "");
     
   return RT_OK;
 }

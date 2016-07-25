@@ -22,15 +22,13 @@ public:
   ~rtRemoteFileResolver();
 
 public:
-  virtual rtError open(rtRemoteIAddress const& endpoint_address) override;
+  virtual rtError open() override;
   virtual rtError close() override;
-  virtual rtError registerObject(std::string const& name, rtRemoteIAddress const& endpoint_address) override;
-  virtual rtError locateObject(std::string const& name, rtRemoteIAddress*& endpoint_address,
+  virtual rtError registerObject(std::string const& name, rtRemoteAddrPtr endpoint_address) override;
+  virtual rtError locateObject(std::string const& name, rtRemoteAddrPtr& endpoint_address,
     uint32_t timeout) override;
 
 private:
-  std::string       m_rpc_addr;
-  uint16_t          m_rpc_port;
   FILE*             m_db_fp;
   rtRemoteEnvPtr    m_env;
 };

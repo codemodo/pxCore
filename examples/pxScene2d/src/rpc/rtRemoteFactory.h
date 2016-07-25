@@ -15,14 +15,14 @@ public:
   rtRemoteFactory(rtRemoteEnvironment* env);
   ~rtRemoteFactory();
 private:
-  using AddrCommandHandler = rtError (*)(std::string const&, rtRemoteIAddress*&);
+  using AddrCommandHandler = rtError (*)(std::string const&, rtRemoteAddrPtr&);
   using AddrCommandHandlerMap = std::map< std::string, AddrCommandHandler >;
 
 public:
   rtRemoteIResolver* createResolver(rtRemoteEnvironment* env);
-  rtError createAddress(std::string const& uri, rtRemoteIAddress*& addr);
-  rtError registerFunctionCreateAddress(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteIAddress *&));
-  rtError updateFunctionCreateAddress(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteIAddress *&));
+  rtError createAddress(std::string const& uri, rtRemoteAddrPtr& addr);
+  rtError registerFunctionCreateAddress(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteAddrPtr&));
+  rtError updateFunctionCreateAddress(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteAddrPtr&));
   
   rtRemoteEnvironment* m_env;
   AddrCommandHandlerMap m_command_handlers;

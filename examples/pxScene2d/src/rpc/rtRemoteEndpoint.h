@@ -61,7 +61,6 @@ class rtRemoteNetAddress : public virtual rtRemoteIAddress
 {
 public:
   rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port);
-	rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port, NetType nt, CastType ct);
 	
 	virtual std::string toUri() override;
 
@@ -71,17 +70,9 @@ public:
 	inline int port() const
 	  { return m_port; }
 
-	inline NetType netType() const
-	  { return m_net_type; }
-
-	inline CastType castType() const
-	  { return m_cast_type; }
-
 protected:
 	std::string         m_host;
 	int                 m_port;
-	NetType  m_net_type;
-	CastType m_cast_type;
 };
 
 /* Remote endpoint addresses with path */
@@ -118,8 +109,8 @@ public:
 	  { m_fd = fd; }
 
 protected:
-  rtRemoteIEndpoint(const rtRemoteIAddress* const ep_addr);
-  const rtRemoteIAddress* const m_addr;
+  rtRemoteIEndpoint(rtRemoteAddrPtr ep_addr);
+  rtRemoteAddrPtr m_addr;
   int m_fd;
 };
 
@@ -133,7 +124,7 @@ class rtRemoteIStreamEndpoint
 class rtRemoteStreamServerEndpoint : public virtual rtRemoteIEndpoint, public rtRemoteIStreamEndpoint
 {
 public:
-  rtRemoteStreamServerEndpoint(const rtRemoteIAddress* const ep_addr);
+  rtRemoteStreamServerEndpoint(rtRemoteAddrPtr ep_addr);
   
   virtual rtError open() override;
 	virtual rtError close() override;
@@ -141,14 +132,14 @@ public:
 	virtual rtError receive(int fd) override;
 	rtError doBind();
 	rtError doListen();
-	rtError doAccept(int& new_fd, rtRemoteIAddress*& remote_addr);
+	rtError doAccept(int& new_fd, rtRemoteAddrPtr& remote_addr);
 
 	inline sockaddr_storage sockaddr() const
 	  { return m_socket; }
 
 	sockaddr_storage m_socket;
 };
-
+/*
 class rtRemoteStreamClientEndpoint : public virtual rtRemoteIEndpoint, public rtRemoteIStreamEndpoint
 {
 public:
@@ -202,5 +193,5 @@ public:
 	virtual rtError open() override;
 	virtual rtError close() override;
 };
-
+*/
 #endif

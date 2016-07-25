@@ -43,7 +43,7 @@ rtRemoteFactory::~rtRemoteFactory()
 }
 
 rtError
-rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteIAddress *&))
+rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteAddrPtr&))
 {
   if (m_command_handlers.find(scheme) != m_command_handlers.end())
   {
@@ -55,7 +55,7 @@ rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtErro
 }
 
 rtError
-rtRemoteFactory::updateFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteIAddress *&))
+rtRemoteFactory::updateFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteAddrPtr&))
 {
   m_command_handlers.insert(AddrCommandHandlerMap::value_type(scheme, f));
   return RT_OK;
@@ -86,7 +86,7 @@ rtRemoteFactory::createResolver(rtRemoteEnvironment* env)
 }
 
 rtError
-rtRemoteFactory::createAddress(std::string const& uri, rtRemoteIAddress*& endpoint_addr)
+rtRemoteFactory::createAddress(std::string const& uri, rtRemoteAddrPtr& endpoint_addr)
 {
   std::string scheme = uri.substr(0, uri.find(":"));
   

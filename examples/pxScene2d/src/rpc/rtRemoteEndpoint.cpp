@@ -53,16 +53,6 @@ rtRemoteNetAddress::rtRemoteNetAddress(std::string const& scheme, std::string co
   : rtRemoteIAddress(scheme)
   , m_host(host)
   , m_port(port)
-  , m_net_type(NetType::UNK)
-  , m_cast_type(CastType::UNK)
-{ }
-
-rtRemoteNetAddress::rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port, NetType nt, CastType ct)
-  : rtRemoteIAddress(scheme)
-  , m_host(host)
-  , m_port(port)
-  , m_net_type(nt)
-  , m_cast_type(ct)
 { }
 
 std::string
@@ -102,7 +92,7 @@ rtRemoteDistributedAddress::toUri()
 // Endpoint abstractions                 
 /////////////////////////
 
-rtRemoteIEndpoint::rtRemoteIEndpoint(const rtRemoteIAddress* const ep_addr)
+rtRemoteIEndpoint::rtRemoteIEndpoint(rtRemoteAddrPtr ep_addr)
 : m_addr(ep_addr)
 , m_fd(-1)
 {
@@ -116,8 +106,8 @@ rtRemoteIEndpoint::~rtRemoteIEndpoint()
   m_fd = -1;
 }
 
-rtRemoteStreamServerEndpoint::rtRemoteStreamServerEndpoint(const rtRemoteIAddress* const addr)
-: rtRemoteIEndpoint(addr)
+rtRemoteStreamServerEndpoint::rtRemoteStreamServerEndpoint(rtRemoteAddrPtr ep_addr)
+: rtRemoteIEndpoint(ep_addr)
 {
   memset(&m_socket, 0, sizeof(sockaddr_storage));
 }
@@ -131,7 +121,7 @@ rtRemoteStreamServerEndpoint::open()
     return RT_FAIL;
   }
 
-  rtError e = rtRemoteEndpointAddressToSocket(*m_addr, m_socket);
+  rtError e = rtRemoteEndpointAddressToSocket(m_addr, m_socket);
   if (e != RT_OK)
   {
     rtLogError("failed to convert from endpoint address to sockaddr");
@@ -212,7 +202,7 @@ rtRemoteStreamServerEndpoint::doListen()
 }
 
 rtError
-rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteIAddress*& remote_addr)
+rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteAddrPtr& remote_addr)
 {
   sockaddr_storage remote_endpoint;
   memset(&remote_endpoint, 0, sizeof(remote_endpoint));
@@ -242,7 +232,7 @@ rtRemoteStreamServerEndpoint::receive(int /*fd*/)
 {
   return RT_OK;
 }
-
+/*
 rtRemoteStreamClientEndpoint::rtRemoteStreamClientEndpoint(const rtRemoteIAddress* const addr)
 : rtRemoteIEndpoint(addr)
 {
@@ -366,3 +356,4 @@ rtRemoteNamedPipeEndpoint::close()
   // TODO
   return RT_OK;
 }
+*/

@@ -9,8 +9,8 @@
 #include <netinet/tcp.h>
 #include <sys/types.h>
 #include <netdb.h>
-#include <exception>
 #include <algorithm>
+#include <memory>
 
 
 //TODO Maybe remove CastType and NetType from rtRemoteIAddress
@@ -80,36 +80,30 @@ rtRemoteParseCastType(std::string const& host, NetType const& net_type, CastType
 }
 
 rtError
-rtRemoteEndpointAddressToSocket(rtRemoteIAddress const& addr, sockaddr_storage& ss)
+rtRemoteEndpointAddressToSocket(rtRemoteAddrPtr addr, sockaddr_storage& ss)
 {
-  try
+  if (auto local = dynamic_pointer_cast<rtRemoteLocalAddress>(addr))
   {
-    rtRemoteLocalAddress const& tmp = dynamic_cast<rtRemoteLocalAddress const&>(addr);
-    if (!tmp.isSocket())
+    if (!local->isSocket())
     {
       rtLogError("local address is not unix domain socket");
       return RT_FAIL;
     }
-    return rtParseAddress(ss, tmp.path().c_str(), 0, nullptr);
+    return rtParseAddress(ss, local->path().c_str(), 0, nullptr);
   }
-  catch (const std::bad_cast& e)
+  else if (auto net = dynamic_pointer_cast<rtRemoteNetAddress>(addr))
   {
-    try
-    {
-      rtRemoteNetAddress const& tmp = dynamic_cast<rtRemoteNetAddress const&>(addr);
-      return rtParseAddress(ss, tmp.host().c_str(), tmp.port(), nullptr);
-    }
-    catch (const std::bad_cast& e)
-    {
-      return RT_FAIL;
-    }
+    return rtParseAddress(ss, net->host().c_str(), net->port(), nullptr);
   }
-  return RT_FAIL;
+  else
+  {
+    return RT_FAIL;
+  }
 }
 
 //TODO Better error handling here
 rtError
-rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress*& endpoint_addr)
+rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteAddrPtr& endpoint_addr)
 {
   std::stringstream buff;
   
@@ -141,7 +135,7 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
   {
     strncpy(addr_buff, (const char*)addr, sizeof(addr_buff) -1);
     buff << addr_buff;
-    endpoint_addr = new rtRemoteLocalAddress(scheme, addr_buff);
+    endpoint_addr = std::make_shared<rtRemoteLocalAddress>(scheme, addr_buff);
     return RT_OK;
   }
   else
@@ -152,7 +146,7 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
     buff << addr_buff;
     buff << ":";
     buff << port;
-    endpoint_addr = new rtRemoteNetAddress(scheme, addr_buff, port);
+    endpoint_addr = std::make_shared<rtRemoteNetAddress>(scheme, addr_buff, port);
     return RT_OK;
   }
   return RT_OK;
@@ -160,7 +154,7 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
 
 //TODO modularize internals
 rtError
-rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_addr)
+rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteAddrPtr& endpoint_addr)
 {
   size_t index;
   index = uri.find("://");
@@ -192,7 +186,7 @@ rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_add
   if (ch == '/' || ch == '.')
   { // local socket
     std::string path = uri.substr(index, std::string::npos);
-    endpoint_addr = new rtRemoteLocalAddress(scheme, path);
+    endpoint_addr = std::make_shared<rtRemoteLocalAddress>(scheme, path);
   }
   else
   { // network socket
@@ -217,12 +211,7 @@ rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_add
     std::string host;
     host = uri.substr(index, index_port - index);
 
-    NetType net_type;
-    rtRemoteParseNetType(host, net_type);
-    CastType cast_type;
-    rtRemoteParseCastType(host, net_type, cast_type);
-
-    endpoint_addr = new rtRemoteNetAddress(scheme, host, port, net_type, cast_type);   
+    endpoint_addr = std::make_shared<rtRemoteNetAddress>(scheme, host, port);   
   }
   return RT_OK;
 }

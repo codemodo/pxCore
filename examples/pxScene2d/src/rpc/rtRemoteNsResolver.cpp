@@ -59,21 +59,8 @@ rtRemoteNsResolver::~rtRemoteNsResolver()
 }
 
 rtError
-rtRemoteNsResolver::open(rtRemoteIAddress const& endpoint_address)
+rtRemoteNsResolver::open()
 {
-  sockaddr_storage rpc_endpoint;
-  rtRemoteEndpointAddressToSocket(endpoint_address, rpc_endpoint);
-  char buff[128];
-  void* addr = nullptr;
-  rtGetInetAddr(rpc_endpoint, &addr);
-  
-  socklen_t len;
-  rtSocketGetLength(rpc_endpoint, &len);
-  char const* p = inet_ntop(rpc_endpoint.ss_family, addr, buff, len);
-  if (p)
-    m_rpc_addr = p;
-  rtGetPort(rpc_endpoint, &m_rpc_port);
-
   rtError err = init();
   if (err != RT_OK)
   {
@@ -90,17 +77,16 @@ rtRemoteNsResolver::open(rtRemoteIAddress const& endpoint_address)
 
   m_read_thread.reset(new std::thread(&rtRemoteNsResolver::runListener, this));
   return RT_OK;
-
 }
 
 rtError
-rtRemoteNsResolver::registerObject(std::string const& name, rtRemoteIAddress const& endpoint_address)
+rtRemoteNsResolver::registerObject(std::string const& name, rtRemoteAddrPtr endpoint_address)
 {
     return registerObject(name, endpoint_address, 3000);
 }
 
 rtError
-rtRemoteNsResolver::registerObject(std::string const& name, rtRemoteIAddress const& endpoint_address, uint32_t timeout)
+rtRemoteNsResolver::registerObject(std::string const& name, rtRemoteAddrPtr endpoint_address, uint32_t timeout)
 {
   if (m_static_fd == -1)
   {
@@ -191,7 +177,7 @@ rtRemoteNsResolver::registerObject(std::string const& name, rtRemoteIAddress con
 }
 
 rtError
-rtRemoteNsResolver::locateObject(std::string const& name, rtRemoteIAddress*& endpoint_address,
+rtRemoteNsResolver::locateObject(std::string const& name, rtRemoteAddrPtr& endpoint_address,
     uint32_t timeout)
 {
   if (m_static_fd == -1)
@@ -255,18 +241,27 @@ rtRemoteNsResolver::locateObject(std::string const& name, rtRemoteIAddress*& end
       }
       else
       {
-        RT_ASSERT(searchResponse->HasMember(kFieldNameIp));
-        RT_ASSERT(searchResponse->HasMember(kFieldNamePort));
         RT_ASSERT(searchResponse->HasMember(kFieldNameScheme));
-
-        // rtError err = rtParseAddress(endpoint, (*searchResponse)[kFieldNameIp].GetString(),
-        //   (*searchResponse)[kFieldNamePort].GetInt(), nullptr);
-        
-        // if (err != RT_OK)
-        //   return err;
-    endpoint_address = new rtRemoteLocalAddress( (*searchResponse)[kFieldNameScheme].GetString()
-                                  , (*searchResponse)[kFieldNameIp].GetString()
-                                  );
+        RT_ASSERT(searchResponse->HasMember(kFieldNameEndpointType));
+        if (std::string((*searchResponse)[kFieldNameEndpointType].GetString()).compare(kEndpointTypeLocal) == 0)
+        {
+          RT_ASSERT(searchResponse->HasMember(kFieldNamePath));
+          std::string scheme, path;
+          scheme = (*searchResponse)[kFieldNameScheme].GetString();
+          path = (*searchResponse)[kFieldNamePath].GetString();
+          endpoint_address = std::make_shared<rtRemoteLocalAddress>(scheme, path);
+        }
+        else
+        {
+          RT_ASSERT(searchResponse->HasMember(kFieldNameIp));
+          RT_ASSERT(searchResponse->HasMember(kFieldNamePort));
+          std::string scheme, host;
+          int port;
+          scheme = (*searchResponse)[kFieldNameScheme].GetString();
+          host = (*searchResponse)[kFieldNameIp].GetString();
+          port = (*searchResponse)[kFieldNamePort].GetInt();
+          endpoint_address = std::make_shared<rtRemoteNetAddress>(scheme, host, port);
+        }
       }
     }
     else
