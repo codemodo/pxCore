@@ -14,6 +14,7 @@
 #include <rapidjson/document.h>
 
 #define kInvalidSocket (-1)
+#define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
 
 class rtRemoteClient;
 class rtRemoteServer;
@@ -22,6 +23,7 @@ class rtRemoteStreamSelector;
 class rtObjectCache;
 class rtRemoteFactory;
 class rtRemoteIAddress;
+class rtRemoteIResolver;
 
 enum class NetType { IPV4, IPV6, ICMP, UNK };
 enum class CastType { UNI, MULTI, BROAD, UNK };
@@ -89,5 +91,6 @@ using rtCorrelationKey = uint32_t;
 using rtRemoteMessageHandler = std::function<rtError (std::shared_ptr<rtRemoteClient>& client, rtJsonDocPtr const& msg)>;
 using rtRemoteInactivityHandler = std::function<rtError(time_t lastMessageTime, time_t now)>;
 using rtRemoteAddrPtr = std::shared_ptr< rtRemoteIAddress >;
+using rtRemoteResolverPtr = rtRemoteIResolver*;
 
 #endif

@@ -249,7 +249,10 @@ rtRemoteServer::open()
   if (err != RT_OK)
     return err;
 
-  m_resolver = m_env->Factory->createResolver(m_env);
+  err = m_env->Factory->createResolver(m_resolver);
+  if (err != RT_OK)
+    return err;
+    
   err = start();
   if (err != RT_OK)
   {
@@ -341,25 +344,6 @@ rtRemoteServer::runListener()
         lastKeepAliveCheck = now;
     }
   }
-}
-
-void
-rtRemoteServer::doAccept(int fd)
-{
-  // rtRemoteIAddress* peer_addr;
-  // int new_fd;
-  // m_endpoint_server->doAccept(new_fd, peer_addr);
-  // sockaddr_storage remote_endpoint;
-  // rtRemoteEndpointAddressToSocket(*peer_addr, remote_endpoint);
-
-  // sockaddr_storage local_endpoint;
-  // memset(&local_endpoint, 0, sizeof(sockaddr_storage));
-  // rtGetSockName(fd, local_endpoint);
-
-  // std::shared_ptr<rtRemoteClient> newClient(new rtRemoteClient(m_env, new_fd, local_endpoint, remote_endpoint));
-  // newClient->setMessageCallback(std::bind(&rtRemoteServer::onIncomingMessage, this, std::placeholders::_1, std::placeholders::_2));
-  // newClient->open();
-  // m_connected_clients.push_back(newClient);
 }
 
 rtError

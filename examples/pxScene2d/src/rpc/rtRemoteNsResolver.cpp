@@ -474,9 +474,6 @@ rtRemoteNsResolver::doDispatch(char const* buff, int n, sockaddr_storage* peer)
     return;
   }
 
-  // https://isocpp.org/wiki/faq/pointers-to-members#macro-for-ptr-to-memfn
-  #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
-
   err = CALL_MEMBER_FN(*this, itr->second)(doc, *peer);
   if (err != RT_OK)
   {

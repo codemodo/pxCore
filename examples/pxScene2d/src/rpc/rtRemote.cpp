@@ -33,7 +33,7 @@ rtRemoteEnvironment::rtRemoteEnvironment(rtRemoteConfig* config)
   ObjectCache = new rtObjectCache(this);
 
   Factory = new rtRemoteFactory(this);
-  Factory->registerFunctionCreateAddress("tcp", &rtRemoteCreateTcpAddress);
+  Factory->registerFunctionCreateAddress("tcp", &rtRemoteFactory::onCreateAddressTcp);
 }
 
 rtRemoteEnvironment::~rtRemoteEnvironment()
