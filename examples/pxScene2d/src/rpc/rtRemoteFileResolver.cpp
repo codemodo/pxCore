@@ -77,7 +77,7 @@ rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteAddrPtr /*
   rapidjson::FileReadStream is(m_db_fp, readBuffer, sizeof(readBuffer));
   doc.ParseStream(is);
 
-//TODO
+  //TODO
   rapidjson::Pointer("/" + name + "/" + kFieldNameIp).Set(doc, "");
   rapidjson::Pointer("/" + name + "/" + kFieldNamePort).Set(doc, 11);
 

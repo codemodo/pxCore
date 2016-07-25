@@ -146,3 +146,48 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
   }
   return RT_OK;
 }
+
+rtError
+rtRemoteParseUri(std::string const& uri, std::string& scheme, std::string& path, std::string& host, uint16_t* port)
+{
+  size_t index = uri.find("://");
+  if (index == std::string::npos)
+  {
+   rtLogError("Invalid uri: %s. Expected: <scheme>://<host>[:<port>][<path>]", uri.c_str());
+   return RT_FAIL;
+  }
+
+  // extract scheme
+  scheme = uri.substr(0, index);
+
+  // We either have a path or host now.  Let's pull the remaining info.
+  index += 3;
+  char ch = uri.at(index);
+  if (ch == '/' || ch == '.')
+  { // local socket
+    path = uri.substr(index, std::string::npos);
+  }
+  else
+  { // network socket
+    // get port
+    std::string port_string;
+    size_t index_port = uri.find_last_of(":");
+    if (index_port == std::string::npos // no port. no colon found
+      || uri.at(index_port-1) == ':' // no port. colon was part of ipv6 addr
+      || index_port == index-3) // no port.  last colon equals colon in ://
+    {
+      rtLogWarn("No port included included in URI: %s. Defaulting to 0", uri.c_str());
+      port_string = "0";
+      index_port = std::string::npos; // set this for host extraction below
+    }
+    else
+    {
+      port_string = uri.substr(index_port+1, std::string::npos);
+    }
+    *port = stoi(port_string);
+    
+    // get host
+    host = uri.substr(index, index_port - index);
+  }
+  return RT_OK;
+}

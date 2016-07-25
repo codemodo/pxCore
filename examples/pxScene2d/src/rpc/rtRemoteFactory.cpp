@@ -102,60 +102,38 @@ rtRemoteFactory::createAddress(std::string const& uri, rtRemoteAddrPtr& endpoint
 rtError
 rtRemoteFactory::onCreateAddressTcp(std::string const& uri, rtRemoteAddrPtr& endpoint_addr)
 {
-  size_t index = uri.find("://");
-  if (index == std::string::npos)
-  {
-   rtLogError("Invalid uri: %s. Expected: <scheme>://<host>[:<port>][<path>]", uri.c_str());
-   return RT_FAIL;
-  }
+  std::string scheme;
+  std::string path;
+  std::string host;
+  uint16_t* port;
+
+  rtError e;
+  e = rtRemoteParseUri(uri, scheme, path, host, port);
+  if (e != RT_OK)
+    return e;
   
-  // extract scheme
-  std::string scheme = uri.substr(0, index);
+  RT_ASSERT(!scheme.empty());
+  
   // double check that correct create function is being used
   char const* s = scheme.c_str();
   if (s != nullptr)
   {
     if (strcasecmp(s, "tcp") != 0)
     {
-      rtLogError("Cannot create tcp addr from uri: %s", uri.c_str());
+      rtLogError("failed to create endpoint addr from uri: %s.  invalid scheme", uri.c_str());
       return RT_FAIL;
     }
   }
   // make lowercase for consistency
   std::transform(scheme.begin(), scheme.end(), scheme.begin(), ::tolower);
 
-  // We either have a path or host now.  Let's pull the remaining info.
-  index += 3;
-  char ch = uri.at(index);
-  if (ch == '/' || ch == '.')
+  if (!path.empty())
   { // local socket
-    std::string path = uri.substr(index, std::string::npos);
     endpoint_addr = std::make_shared<rtRemoteLocalAddress>(scheme, path);
   }
-  else
-  { // network socket
-    // get port
-    std::string port_string;
-    size_t index_port = uri.find_last_of(":");
-    if (index_port == std::string::npos // no port. no colon found
-      || uri.at(index_port-1) == ':' // no port. colon was part of ipv6 addr
-      || index_port == index-3) // no port.  last colon equals colon in ://
-    {
-      rtLogWarn("No port included included in URI: %s. Defaulting to 0", uri.c_str());
-      port_string = "0";
-      index_port = std::string::npos; // set this for host extraction below
-    }
-    else
-    {
-      port_string = uri.substr(index_port+1, std::string::npos);
-    }
-    int port = stoi(port_string);
-    
-    // get host
-    std::string host;
-    host = uri.substr(index, index_port - index);
-
-    endpoint_addr = std::make_shared<rtRemoteNetAddress>(scheme, host, port);   
+  else if (!host.empty() && port != nullptr)
+  {
+    endpoint_addr = std::make_shared<rtRemoteNetAddress>(scheme, host, *port);   
   }
   return RT_OK;
 }
