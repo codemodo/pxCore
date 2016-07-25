@@ -338,7 +338,6 @@ rtRemoteMulticastResolver::onSearch(rtJsonDocPtr const& doc, sockaddr_storage co
     doc.AddMember(kFieldNameScheme, "tcp", doc.GetAllocator());
     doc.AddMember(kFieldNameIp, m_rpc_addr, doc.GetAllocator());
     doc.AddMember(kFieldNamePort, m_rpc_port, doc.GetAllocator());
-    rtLogWarn("\n\n\nSending address as %s:%d", m_rpc_addr.c_str(), m_rpc_port);
     // echo kback to sender
     doc.AddMember(kFieldNameSenderId, senderId->value.GetInt(), doc.GetAllocator());
     doc.AddMember(kFieldNameCorrelationKey, key, doc.GetAllocator());

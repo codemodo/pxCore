@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <exception>
+#include <algorithm>
 
 
 //TODO Maybe remove CastType and NetType from rtRemoteIAddress
@@ -96,7 +97,7 @@ rtRemoteEndpointAddressToSocket(rtRemoteIAddress const& addr, sockaddr_storage& 
     try
     {
       rtRemoteNetAddress const& tmp = dynamic_cast<rtRemoteNetAddress const&>(addr);
-      return rtParseAddress(ss,tmp.host().c_str(), tmp.port(), nullptr);
+      return rtParseAddress(ss, tmp.host().c_str(), tmp.port(), nullptr);
     }
     catch (const std::bad_cast& e)
     {
@@ -106,7 +107,6 @@ rtRemoteEndpointAddressToSocket(rtRemoteIAddress const& addr, sockaddr_storage& 
   return RT_FAIL;
 }
 
-//TODO change this so that it doesn't need to have conn_type passed in
 //TODO Better error handling here
 rtError
 rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress*& endpoint_addr)
@@ -158,7 +158,7 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
   return RT_OK;
 }
 
-//TODO Better error handling here
+//TODO modularize internals
 rtError
 rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_addr)
 {
@@ -166,42 +166,54 @@ rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_add
   index = uri.find("://");
   if (index == std::string::npos)
   {
-   rtLogError("invalid uri: %s", uri.c_str());
+   rtLogError("Invalid uri: %s. Expected: <scheme>://<host>[:<port>][<path>]", uri.c_str());
    return RT_FAIL;
   }
   
   // extract scheme
   std::string scheme;
   scheme = uri.substr(0, index);
+  // double check that correct create function is being used
   char const* s = scheme.c_str();
   if (s != nullptr)
   {
     if (strcasecmp(s, "tcp") != 0)
     {
-      rtLogError("cannot create tcp addr from uri: %s", uri.c_str());
+      rtLogError("Cannot create tcp addr from uri: %s", uri.c_str());
       return RT_FAIL;
     }
   }
+  // make lowercase for consistency
+  std::transform(scheme.begin(), scheme.end(), scheme.begin(), ::tolower);
 
-  // extract remaining info
+  // We either have a path or host now.  Let's pull the remaining info.
   index += 3;
   char ch = uri.at(index);
   if (ch == '/' || ch == '.')
-  {
-    // local socket
+  { // local socket
     std::string path = uri.substr(index, std::string::npos);
     endpoint_addr = new rtRemoteLocalAddress(scheme, path);
   }
   else
-  {
-    // network socket
+  { // network socket
+    // get port
     std::string port_string;
     size_t index_port = uri.find_last_of(":");
-    port_string = uri.substr(index_port+1, std::string::npos);
+    if (index_port == std::string::npos // no port. no colon found
+      || uri.at(index_port-1) == ':' // no port. colon was part of ipv6 addr
+      || index_port == index-3) // no port.  last colon equals colon in ://
+    {
+      rtLogWarn("No port included included in URI: %s. Defaulting to 0", uri.c_str());
+      port_string = "0";
+      index_port = std::string::npos; // set this for host extraction below
+    }
+    else
+    {
+      port_string = uri.substr(index_port+1, std::string::npos);
+    }
     int port = stoi(port_string);
-    // TODO should check to make sure previous char wasn't also a colon
-    // as well as if any result came back at all
-
+    
+    // get host
     std::string host;
     host = uri.substr(index, index_port - index);
 
