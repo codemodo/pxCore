@@ -3,7 +3,7 @@
 #include "rtRemoteIResolver.h"
 #include "rtRemoteFileResolver.h"
 #include "rtRemoteMulticastResolver.h"
-#include "rtRemoteNsResolver.h"
+#include "rtRemoteUnicastResolver.h"
 #include "rtRemoteTypes.h"
 #include "rtRemoteUtils.h"
 #include <algorithm>
@@ -76,7 +76,7 @@ rtRemoteFactory::createResolver(rtRemoteResolverPtr& resolver)
       resolver = new rtRemoteFileResolver(m_env);
       break;
     case RT_RESOLVER_UNICAST:
-      resolver = new rtRemoteNsResolver(m_env);
+      resolver = new rtRemoteUnicastResolver(m_env);
       break;
     default:
       resolver = new rtRemoteMulticastResolver(m_env);

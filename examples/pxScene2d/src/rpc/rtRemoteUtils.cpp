@@ -12,11 +12,6 @@
 #include <algorithm>
 #include <memory>
 
-
-//TODO Maybe remove CastType and NetType from rtRemoteIAddress
-//     and instead have free functions here that parse those
-//     given an address object
-
 rtError
 rtRemoteParseNetType(std::string const& host, NetType& result)
 {
