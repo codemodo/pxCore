@@ -52,6 +52,7 @@ private:
   rtError onMethodCall(std::shared_ptr<rtRemoteClient>& client, rtJsonDocPtr const& doc);
   rtError onKeepAlive(std::shared_ptr<rtRemoteClient>& client, rtJsonDocPtr const& doc);
   rtError openRpcListener();
+  rtError parseConfig(sockaddr_storage& result);
 
 private:
   struct ObjectReference

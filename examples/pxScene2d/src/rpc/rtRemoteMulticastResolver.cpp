@@ -405,23 +405,27 @@ rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteAddrPtr
   {
     RT_ASSERT(searchResponse->HasMember(kFieldNameScheme));
     RT_ASSERT(searchResponse->HasMember(kFieldNameEndpointType));
-    if (std::string((*searchResponse)[kFieldNameEndpointType].GetString()).compare(kEndpointTypeLocal) == 0)
+    std::string type, scheme;
+    type   = (*searchResponse)[kFieldNameEndpointType].GetString();
+    scheme = (*searchResponse)[kFieldNameScheme].GetString();
+    
+    if (type.compare(kEndpointTypeLocal) == 0)
     {
       RT_ASSERT(searchResponse->HasMember(kFieldNamePath));
-      std::string scheme, path;
-      scheme = (*searchResponse)[kFieldNameScheme].GetString();
+      std::string path;
       path = (*searchResponse)[kFieldNamePath].GetString();
+      // create and return local endpoint address
       endpoint_address = std::make_shared<rtRemoteLocalAddress>(scheme, path);
     }
-    else
+    else if (type.compare(kEndpointTypeNet) == 0)
     {
       RT_ASSERT(searchResponse->HasMember(kFieldNameIp));
       RT_ASSERT(searchResponse->HasMember(kFieldNamePort));
-      std::string scheme, host;
-      int port;
-      scheme = (*searchResponse)[kFieldNameScheme].GetString();
+      std::string host;
+      uint16_t port;
       host = (*searchResponse)[kFieldNameIp].GetString();
       port = (*searchResponse)[kFieldNamePort].GetInt();
+      // create and return net endpoint address
       endpoint_address = std::make_shared<rtRemoteNetAddress>(scheme, host, port);
     }
   }
@@ -513,6 +517,7 @@ rtRemoteMulticastResolver::doDispatch(char const* buff, int n, sockaddr_storage*
     return;
   }
 
+  // defined in rtRemoteTypes
   err = CALL_MEMBER_FN(*this, itr->second)(doc, *peer);
   if (err != RT_OK)
   {

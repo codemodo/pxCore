@@ -317,22 +317,20 @@ rtRemoteServer::runListener()
     }
 
     if (FD_ISSET(m_endpoint_server->fd(), &read_fds))
-      //doAccept(m_endpoint_server->fd());
     {
+      // accept connection and retrieve connecting address and new fd created for this connection
       std::shared_ptr<rtRemoteIAddress> remote_addr;
       int new_fd;
       m_endpoint_server->doAccept(new_fd, remote_addr);
-      sockaddr_storage remote_sock;
-      memset(&remote_sock, 0, sizeof(remote_sock));
-      rtRemoteEndpointAddressToSocket(remote_addr, remote_sock);
 
-      sockaddr_storage local_endpoint;
-      memset(&local_endpoint, 0, sizeof(sockaddr_storage));
-      rtGetSockName(m_endpoint_server->fd(), local_endpoint);
-      std::shared_ptr<rtRemoteIAddress> tmp;
-      rtRemoteSocketToEndpointAddress(local_endpoint, ConnType::STREAM, tmp);
+      // retrieve address information for new fd 
+      std::shared_ptr<rtRemoteIAddress> local_addr;
+      sockaddr_storage local_sock;
+      memset(&local_sock, 0, sizeof(local_sock));
+      rtGetSockName(m_endpoint_server->fd(), local_sock);
+      rtRemoteSocketToEndpointAddress(local_sock, ConnType::STREAM, local_addr);
 
-      std::shared_ptr<rtRemoteClient> newClient(new rtRemoteClient(m_env, new_fd, tmp, remote_addr));
+      std::shared_ptr<rtRemoteClient> newClient(new rtRemoteClient(m_env, new_fd, local_addr, remote_addr));
       newClient->setMessageCallback(std::bind(&rtRemoteServer::onIncomingMessage, this, std::placeholders::_1, std::placeholders::_2));
       newClient->open();
       m_connected_clients.push_back(newClient);
@@ -409,22 +407,19 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
   // if object is not registered with us locally, then check network
   if (!obj)
   {
-    sockaddr_storage rpc_endpoint;
     std::shared_ptr<rtRemoteIAddress> object_addr;
-    err = m_resolver->locateObject(name, object_addr, timeout);  
-    
-    // TODO Fiuk
-    // Right now, converting back to socket.  Need to change client/stream to
-    // use abstracted addr
+    err = m_resolver->locateObject(name, object_addr, timeout);
+    //TODO get rid of once same_endpoint changed
+    sockaddr_storage rpc_endpoint;
     rtRemoteEndpointAddressToSocket(object_addr, rpc_endpoint);
 
     rtLogDebug("object %s found at endpoint: %s", name.c_str(),
-      rtSocketToString(rpc_endpoint).c_str());
+      object_addr->toUri().c_str());
 
     if (err == RT_OK)
     {
       std::shared_ptr<rtRemoteClient> client;
-      std::string const endpointName = rtSocketToString(rpc_endpoint);
+      std::string const endpointName = object_addr->toUri();
 
       std::unique_lock<std::mutex> lock(m_mutex);
       auto itr = m_object_map.find(endpointName);
@@ -437,6 +432,7 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
       {
         sockaddr_storage tmp;
         memset(&tmp, 0, sizeof(tmp));
+        //TODO get rid of line below, write new same_endpoint func
         rtRemoteEndpointAddressToSocket(i.second->getRemoteEndpoint(), tmp);
         if (same_endpoint(tmp, rpc_endpoint))
         {
@@ -481,12 +477,77 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
 rtError
 rtRemoteServer::openRpcListener()
 {
+  rtError e;
+
+  // pull this endpoint's info from config
+  // and store it in sockaddr_storage
+  sockaddr_storage endpoint_sockaddr;
+  memset(&endpoint_sockaddr, 0, sizeof(endpoint_sockaddr));
+  e = parseConfig(endpoint_sockaddr);
+  if (e != RT_OK)
+  {
+    rtLogError("failed to read endpoint address from config");
+    return e;
+  }
+
+  // populate rtRemoteIAddress member object
+  rtRemoteSocketToEndpointAddress(endpoint_sockaddr, ConnType::STREAM, m_endpoint_addr);
+
+  // create server handle
+  if (m_endpoint_server)
+    delete m_endpoint_server;
+  m_endpoint_server = new rtRemoteStreamServerEndpoint(m_endpoint_addr);
+
+  // initialize endpoint socket
+  e = m_endpoint_server->open();
+  if (e != RT_OK)
+  {
+    rtLogError("failed to open server endpoint");
+    return e;
+  }
+  
+  // set options
+  fcntl(m_endpoint_server->fd(), F_SETFD, fcntl(m_endpoint_server->fd(), F_GETFD) | FD_CLOEXEC);
+  if (!dynamic_pointer_cast<rtRemoteLocalAddress>(m_endpoint_addr))
+  {
+    uint32_t one = 1;
+    if (-1 == setsockopt(m_endpoint_server->fd(), SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
+      rtLogError("setting TCP_NODELAY failed");
+  }
+
+  e = m_endpoint_server->doBind();
+  if (e != RT_OK)
+  {
+    rtLogError("failed to bind server endpoint");
+    return e;
+  }
+  
+  // set options
+  int ret = fcntl(m_endpoint_server->fd(), F_SETFL, O_NONBLOCK);
+  if (ret < 0)
+  {
+    rtError e = rtErrorFromErrno(errno);
+    rtLogError("fcntl: %s", rtStrError(e));
+    return e;
+  }
+
+  e = m_endpoint_server->doListen();
+  if (e != RT_OK)
+  {
+    rtLogError("failed to begin listening on server endpoint");
+    return e;
+  }
+
+  return RT_OK;
+}
+
+rtError
+rtRemoteServer::parseConfig(sockaddr_storage& result)
+{
   int ret = 0;
   char path[UNIX_PATH_MAX];
-
-  sockaddr_storage m_rpc_socket;
-  memset(&m_rpc_socket, 0, sizeof(sockaddr_storage));
   memset(path, 0, sizeof(path));
+  
   cleanup_stale_unix_sockets();
 
   if (is_unix_domain(m_env))
@@ -502,74 +563,14 @@ rtRemoteServer::openRpcListener()
       rtLogInfo("error trying to remove %s. %s", path, rtStrError(e));
     }
 
-    struct sockaddr_un *un_addr = reinterpret_cast<sockaddr_un*>(&m_rpc_socket);
+    struct sockaddr_un *un_addr = reinterpret_cast<sockaddr_un*>(&result);
     un_addr->sun_family = AF_UNIX;
     strncpy(un_addr->sun_path, path, UNIX_PATH_MAX);
   }
   else
   {
-    rtGetDefaultInterface(m_rpc_socket, 0);
+    rtGetDefaultInterface(result, 0);
   }
-
-  // TODO Fiuk need to clean this up
-  std::stringstream uri_buff;
-  uri_buff << "tcp://";
-  void* addr = nullptr;
-  char buff[128];
-  rtGetInetAddr(m_rpc_socket, &addr);
-
-  if (m_rpc_socket.ss_family == AF_UNIX)
-  {
-    uri_buff << reinterpret_cast<const char*>(addr);
-  }
-  else
-  {
-    socklen_t len;
-    rtSocketGetLength(m_rpc_socket, &len);
-    char const* p = inet_ntop(m_rpc_socket.ss_family, addr, buff, len);
-    if (p)
-      uri_buff << p;
-    else
-    {
-      rtLogError("failed to get ip information for endpoint address");
-      return RT_FAIL;
-    }
-    uint16_t port;
-    rtGetPort(m_rpc_socket, &port);
-    uri_buff << ":";
-    uri_buff << port;
-  }
-  // end
-  
-  rtError e = m_env->Factory->createAddress(uri_buff.str(), m_endpoint_addr);
-  if (e != RT_OK)
-  {
-    rtLogError("failed to create endpoint address for server");
-    return e;
-  }
-  m_endpoint_server = new rtRemoteStreamServerEndpoint(m_endpoint_addr);
-
-  e = m_endpoint_server->open();
-  if (e != RT_OK)
-  {
-    rtLogError("failed to open server endpoint");
-    return e;
-  }
-
-  e = m_endpoint_server->doBind();
-  if (e != RT_OK)
-  {
-    rtLogError("failed to bind server endpoint");
-    return e;
-  }
-
-  e = m_endpoint_server->doListen();
-  if (e != RT_OK)
-  {
-    rtLogError("failed to begin listening on server endpoint");
-    return e;
-  }
-
   return RT_OK;
 }
 

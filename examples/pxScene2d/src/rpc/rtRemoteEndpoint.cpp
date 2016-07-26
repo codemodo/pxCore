@@ -137,16 +137,6 @@ rtRemoteStreamServerEndpoint::open()
     return e;
   }
 
-  // TODO need to abstract out options, etc.
-  fcntl(m_fd, F_SETFD, fcntl(m_fd, F_GETFD) | FD_CLOEXEC);
-
-  if (m_socket.ss_family != AF_UNIX)
-  {
-    uint32_t one = 1;
-    if (-1 == setsockopt(m_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
-      rtLogError("setting TCP_NODELAY failed");
-  }
-
   return RT_OK;
 }
 
@@ -177,13 +167,6 @@ rtRemoteStreamServerEndpoint::doBind()
   rtGetSockName(m_fd, m_socket);
   rtLogInfo("local rpc listener on: %s", rtSocketToString(m_socket).c_str());
 
-  ret = fcntl(m_fd, F_SETFL, O_NONBLOCK);
-  if (ret < 0)
-  {
-    rtError e = rtErrorFromErrno(errno);
-    rtLogError("fcntl: %s", rtStrError(e));
-    return e;
-  }
   return RT_OK;
 }
 
@@ -210,7 +193,6 @@ rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteAddrPtr& remote_addr
   socklen_t len = sizeof(sockaddr_storage);
 
   new_fd = accept(m_fd, reinterpret_cast<struct sockaddr*>(&remote_endpoint), &len);
-  rtLogInfo("Alex -> accepted as %s", rtSocketToString(remote_endpoint).c_str());
 
   if (new_fd == -1)
   {
