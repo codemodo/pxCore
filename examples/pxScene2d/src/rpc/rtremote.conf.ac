@@ -33,7 +33,7 @@
     "platform":"linux" },
 
 { "name":"rt.rpc.environment.request_timeout",
-    "default_value":"3000",
+    "default_value":"300000",
     "type":"int32" },
 
 { "name":"rt.rpc.cache.max_object_lifetime",
@@ -45,7 +45,7 @@
     "type":"string" },
 
 { "name":"rt.rpc.resolver.locate_timeout",
-    "default_value":"3000",
+    "default_value":"300000",
     "type":"int32" },
 
 { "name":"rt.rpc.resolver.multicast.address",

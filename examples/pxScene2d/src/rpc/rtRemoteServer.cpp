@@ -329,8 +329,10 @@ rtRemoteServer::runListener()
       sockaddr_storage local_endpoint;
       memset(&local_endpoint, 0, sizeof(sockaddr_storage));
       rtGetSockName(m_endpoint_server->fd(), local_endpoint);
+      std::shared_ptr<rtRemoteIAddress> tmp;
+      rtRemoteSocketToEndpointAddress(local_endpoint, ConnType::STREAM, tmp);
 
-      std::shared_ptr<rtRemoteClient> newClient(new rtRemoteClient(m_env, new_fd, local_endpoint, remote_sock));
+      std::shared_ptr<rtRemoteClient> newClient(new rtRemoteClient(m_env, new_fd, tmp, remote_addr));
       newClient->setMessageCallback(std::bind(&rtRemoteServer::onIncomingMessage, this, std::placeholders::_1, std::placeholders::_2));
       newClient->open();
       m_connected_clients.push_back(newClient);
@@ -433,7 +435,10 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
       // then just re-use it
       for (auto i : m_object_map)
       {
-        if (same_endpoint(i.second->getRemoteEndpoint(), rpc_endpoint))
+        sockaddr_storage tmp;
+        memset(&tmp, 0, sizeof(tmp));
+        rtRemoteEndpointAddressToSocket(i.second->getRemoteEndpoint(), tmp);
+        if (same_endpoint(tmp, rpc_endpoint))
         {
           client = i.second;
           break;
@@ -443,7 +448,7 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
 
       if (!client)
       {
-        client.reset(new rtRemoteClient(m_env, rpc_endpoint));
+        client.reset(new rtRemoteClient(m_env, m_endpoint_addr));
         client->setMessageCallback(std::bind(&rtRemoteServer::onIncomingMessage, this, 
               std::placeholders::_1, std::placeholders::_2));
         err = client->open();

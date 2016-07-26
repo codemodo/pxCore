@@ -131,16 +131,17 @@ rtRemoteStreamSelector::pollFds()
   return RT_OK;
 }
 
-rtRemoteStream::rtRemoteStream(rtRemoteEnvPtr env, int fd, sockaddr_storage const& local_endpoint, sockaddr_storage const& remote_endpoint)
+rtRemoteStream::rtRemoteStream(rtRemoteEnvPtr env, int fd, rtRemoteAddrPtr const& local_endpoint, rtRemoteAddrPtr const& remote_endpoint)
   : m_fd(fd)
   , m_last_message_time(0)
   , m_last_ka_message_time(0)
   , m_message_handler(nullptr)
   , m_running(false)
   , m_env(env)
+  , m_local_endpoint(local_endpoint)
+  , m_remote_endpoint(remote_endpoint)
 {
-  memcpy(&m_remote_endpoint, &remote_endpoint, sizeof(m_remote_endpoint));
-  memcpy(&m_local_endpoint, &local_endpoint, sizeof(m_local_endpoint));
+  // empty
 }
 
 rtRemoteStream::~rtRemoteStream()
@@ -242,8 +243,11 @@ rtRemoteStream::connect()
 }
 
 rtError
-rtRemoteStream::connectTo(sockaddr_storage const& endpoint)
+rtRemoteStream::connectTo(rtRemoteAddrPtr const& addr)
 {
+  sockaddr_storage endpoint;
+  memset(&endpoint, 0, sizeof(endpoint));
+  rtRemoteEndpointAddressToSocket(addr, endpoint);
   m_fd = socket(endpoint.ss_family, SOCK_STREAM, 0);
   if (m_fd < 0)
   {
@@ -272,13 +276,22 @@ rtRemoteStream::connectTo(sockaddr_storage const& endpoint)
     return e;
   }
 
-  rtGetSockName(m_fd, m_local_endpoint);
-  rtGetPeerName(m_fd, m_remote_endpoint);
+  //rtGetSockName(m_fd, m_local_endpoint);
+  //rtGetPeerName(m_fd, m_remote_endpoint);
 
-  rtLogInfo("new connection (%d) %s --> %s",
-    m_fd,
-    rtSocketToString(m_local_endpoint).c_str(),
-    rtSocketToString(m_remote_endpoint).c_str());
+  if (m_local_endpoint)
+  {
+    rtLogInfo("new connection (%d) %s --> %s",
+      m_fd,
+      m_local_endpoint->toUri().c_str(),
+      m_remote_endpoint->toUri().c_str());
+  }
+  else
+  {
+    rtLogInfo("new connection (%d) --> %s",
+      m_fd,
+      m_remote_endpoint->toUri().c_str());   
+  }
 
   return RT_OK;
 }

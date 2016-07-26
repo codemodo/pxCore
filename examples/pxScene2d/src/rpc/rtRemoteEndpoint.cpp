@@ -209,7 +209,8 @@ rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteAddrPtr& remote_addr
 
   socklen_t len = sizeof(sockaddr_storage);
 
-  new_fd = accept(m_fd, (struct sockaddr*)(&remote_endpoint), &len);
+  new_fd = accept(m_fd, reinterpret_cast<struct sockaddr*>(&remote_endpoint), &len);
+  rtLogInfo("Alex -> accepted as %s", rtSocketToString(remote_endpoint).c_str());
 
   if (new_fd == -1)
   {
