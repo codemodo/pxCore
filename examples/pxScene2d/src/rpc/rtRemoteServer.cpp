@@ -139,35 +139,6 @@ is_unix_domain(rtRemoteEnvironment* env)
   return false;
 }
 
-static bool
-same_endpoint(sockaddr_storage const& addr1, sockaddr_storage const& addr2)
-{
-  if (addr1.ss_family != addr2.ss_family)
-    return false;
-
-  if (addr1.ss_family == AF_INET)
-  {
-    sockaddr_in const* in1 = reinterpret_cast<sockaddr_in const*>(&addr1);
-    sockaddr_in const* in2 = reinterpret_cast<sockaddr_in const*>(&addr2);
-
-    if (in1->sin_port != in2->sin_port)
-      return false;
-
-    return in1->sin_addr.s_addr == in2->sin_addr.s_addr;
-  }
-
-  if (addr1.ss_family == AF_UNIX)
-  {
-    sockaddr_un const* un1 = reinterpret_cast<sockaddr_un const*>(&addr1);
-    sockaddr_un const* un2 = reinterpret_cast<sockaddr_un const*>(&addr2);
-
-    return 0 == strncmp(un1->sun_path, un2->sun_path, UNIX_PATH_MAX);
-  }
-
-  RT_ASSERT(false);
-  return false;
-}
-
 rtRemoteServer::rtRemoteServer(rtRemoteEnvironment* env)
   : m_endpoint_server(nullptr)
   , m_resolver(nullptr)
@@ -409,9 +380,6 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
   {
     std::shared_ptr<rtRemoteIEndpoint> object_endpoint;
     err = m_resolver->locateObject(name, object_endpoint, timeout);
-    //TODO get rid of once same_endpoint changed
-    sockaddr_storage object_sockaddr;
-    rtRemoteEndpointAddressToSocket(object_endpoint, object_sockaddr);
 
     rtLogDebug("object %s found at endpoint: %s", name.c_str(),
       object_endpoint->toUri().c_str());
@@ -430,11 +398,7 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
       // then just re-use it
       for (auto i : m_object_map)
       {
-        sockaddr_storage tmp;
-        memset(&tmp, 0, sizeof(tmp));
-        //TODO get rid of line below, write new same_endpoint func
-        rtRemoteEndpointAddressToSocket(i.second->getRemoteEndpoint(), tmp);
-        if (same_endpoint(tmp, object_sockaddr))
+        if (rtRemoteSameEndpoint(i.second->getRemoteEndpoint(), object_endpoint))
         {
           client = i.second;
           break;
@@ -588,7 +552,7 @@ rtRemoteServer::onOpenSession(std::shared_ptr<rtRemoteClient>& client, rtJsonDoc
     sockaddr_storage const soc = client->getRemoteEndpoint();
     for (auto const& c : m_clients)
     {
-      if (same_endpoint(soc, c.peer))
+      if (rtRemoteSameEndpoint(soc, c.peer))
       {
         rtLogInfo("new session for %s added to %s", rtSocketToString(soc).c_str(), id);
         itr->second.client_fds.push_back(c.fd);

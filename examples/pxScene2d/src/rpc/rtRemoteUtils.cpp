@@ -191,3 +191,56 @@ rtRemoteParseUri(std::string const& uri, std::string& scheme, std::string& path,
   }
   return RT_OK;
 }
+
+bool
+rtRemoteSameEndpoint(sockaddr_storage const& first, sockaddr_storage const& second)
+{
+  if (first.ss_family != second.ss_family)
+    return false;
+
+  if (first.ss_family == AF_INET)
+  {
+    sockaddr_in const* in1 = reinterpret_cast<sockaddr_in const*>(&first);
+    sockaddr_in const* in2 = reinterpret_cast<sockaddr_in const*>(&second);
+
+    if (in1->sin_port != in2->sin_port)
+      return false;
+
+    return in1->sin_addr.s_addr == in2->sin_addr.s_addr;
+  }
+
+  if (first.ss_family == AF_UNIX)
+  {
+    sockaddr_un const* un1 = reinterpret_cast<sockaddr_un const*>(&first);
+    sockaddr_un const* un2 = reinterpret_cast<sockaddr_un const*>(&second);
+
+    return 0 == strncmp(un1->sun_path, un2->sun_path, UNIX_PATH_MAX);
+  }
+
+  RT_ASSERT(false);
+  return false;
+}
+
+bool
+rtRemoteSameEndpoint(rtRemoteEndpointPtr const& first, rtRemoteEndpointPtr const& second)
+{
+  if (auto firstLocal = dynamic_pointer_cast<rtRemoteEndpointLocal>(first))
+  {
+    if (auto secondLocal = dynamic_pointer_cast<rtRemoteEndpointLocal>(second))
+      return *firstLocal == *secondLocal;
+    else
+      return false;
+  }
+  else if (auto firstRemote = dynamic_pointer_cast<rtRemoteEndpointRemote>(first))
+  {
+    if (auto secondRemote = dynamic_pointer_cast<rtRemoteEndpointRemote>(second))
+      return *firstRemote == *secondRemote;
+    else
+      return false;
+  }
+  else
+  {
+    RT_ASSERT(false);
+    return false;
+  }
+}

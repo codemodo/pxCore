@@ -51,6 +51,11 @@ public:
 
 	inline std::string path() const
 	  { return m_path; }
+	
+	inline bool operator==(rtRemoteEndpointLocal const& rhs) const
+	  { return m_path.compare(rhs.path()) == 0
+		      && m_scheme.compare(rhs.scheme()) == 0;
+		}
 
 protected:
 	std::string m_path;
@@ -72,6 +77,12 @@ public:
 
 	inline int port() const
 	  { return m_port; }
+	
+	inline bool operator==(rtRemoteEndpointRemote const& rhs) const
+	  { return m_host.compare(rhs.host()) == 0
+		      && m_port == rhs.port()
+		      && m_scheme.compare(rhs.scheme()) == 0;
+		}
 
 protected:
 	std::string         m_host;
