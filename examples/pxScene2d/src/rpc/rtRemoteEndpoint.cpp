@@ -26,19 +26,19 @@ rtRemoteIEndpoint::rtRemoteIEndpoint(std::string const& scheme)
 rtRemoteIEndpoint::~rtRemoteIEndpoint() { }
 
 // LOCAL //
-rtRemoteLocalAddress::rtRemoteLocalAddress(std::string const& scheme, std::string const& path)
+rtRemoteEndpointLocal::rtRemoteEndpointLocal(std::string const& scheme, std::string const& path)
   : rtRemoteIEndpoint(scheme)
   , m_path(path)
 { }
 
 bool
-rtRemoteLocalAddress::isSocket() const
+rtRemoteEndpointLocal::isSocket() const
 {
   return m_scheme.compare("tcp") == 0 || m_scheme.compare("udp") == 0;
 }
 
 std::string
-rtRemoteLocalAddress::toUri()
+rtRemoteEndpointLocal::toUri()
 {
   std::stringstream buff;
   buff << m_scheme;
@@ -49,14 +49,14 @@ rtRemoteLocalAddress::toUri()
 
 // NETWORK //
 
-rtRemoteNetAddress::rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port)
+rtRemoteEndpointRemote::rtRemoteEndpointRemote(std::string const& scheme, std::string const& host, int port)
   : rtRemoteIEndpoint(scheme)
   , m_host(host)
   , m_port(port)
 { }
 
 std::string
-rtRemoteNetAddress::toUri()
+rtRemoteEndpointRemote::toUri()
 {
   std::stringstream buff;
   buff << m_scheme;
@@ -68,14 +68,14 @@ rtRemoteNetAddress::toUri()
 }
 
 // NETWORK + PATH
-rtRemoteDistributedAddress::rtRemoteDistributedAddress(std::string const& scheme, std::string const& host, int port, std::string const& path)
+rtRemoteEndpointDistributed::rtRemoteEndpointDistributed(std::string const& scheme, std::string const& host, int port, std::string const& path)
   : rtRemoteIEndpoint(scheme)
-  , rtRemoteNetAddress(scheme, host, port)
-  , rtRemoteLocalAddress(scheme, path)
+  , rtRemoteEndpointRemote(scheme, host, port)
+  , rtRemoteEndpointLocal(scheme, path)
 { }
 
 std::string
-rtRemoteDistributedAddress::toUri()
+rtRemoteEndpointDistributed::toUri()
 {
   std::stringstream buff;
   buff << m_scheme;

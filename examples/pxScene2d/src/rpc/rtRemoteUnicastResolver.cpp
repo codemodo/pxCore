@@ -249,7 +249,7 @@ rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteEndpointP
           std::string scheme, path;
           scheme = (*searchResponse)[kFieldNameScheme].GetString();
           path = (*searchResponse)[kFieldNamePath].GetString();
-          endpoint = std::make_shared<rtRemoteLocalAddress>(scheme, path);
+          endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
         }
         else
         {
@@ -260,7 +260,7 @@ rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteEndpointP
           scheme = (*searchResponse)[kFieldNameScheme].GetString();
           host = (*searchResponse)[kFieldNameIp].GetString();
           port = (*searchResponse)[kFieldNamePort].GetInt();
-          endpoint = std::make_shared<rtRemoteNetAddress>(scheme, host, port);
+          endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, port);
         }
       }
     }

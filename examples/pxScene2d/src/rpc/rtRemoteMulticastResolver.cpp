@@ -312,14 +312,14 @@ rtRemoteMulticastResolver::onSearch(rtJsonDocPtr const& doc, sockaddr_storage co
     doc.AddMember(kFieldNameMessageType, kMessageTypeLocate, doc.GetAllocator());
     doc.AddMember(kFieldNameObjectId, std::string(objectId), doc.GetAllocator());
 
-    if (auto netAddr = dynamic_pointer_cast<rtRemoteNetAddress>(itr->second))
+    if (auto netAddr = dynamic_pointer_cast<rtRemoteEndpointRemote>(itr->second))
     {
       doc.AddMember(kFieldNameEndpointType, kEndpointTypeNet, doc.GetAllocator());
       doc.AddMember(kFieldNameScheme, netAddr->scheme(), doc.GetAllocator());
       doc.AddMember(kFieldNameIp, netAddr->host(), doc.GetAllocator());
       doc.AddMember(kFieldNamePort, netAddr->port(), doc.GetAllocator());
     }
-    else if (auto localAddr = dynamic_pointer_cast<rtRemoteLocalAddress>(itr->second))
+    else if (auto localAddr = dynamic_pointer_cast<rtRemoteEndpointLocal>(itr->second))
     {
       doc.AddMember(kFieldNameEndpointType, kEndpointTypeLocal, doc.GetAllocator());
       doc.AddMember(kFieldNameScheme, localAddr->scheme(), doc.GetAllocator());
@@ -415,7 +415,7 @@ rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteEndpoin
       std::string path;
       path = (*searchResponse)[kFieldNamePath].GetString();
       // create and return local endpoint address
-      endpoint = std::make_shared<rtRemoteLocalAddress>(scheme, path);
+      endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
     }
     else if (type.compare(kEndpointTypeNet) == 0)
     {
@@ -426,7 +426,7 @@ rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteEndpoin
       host = (*searchResponse)[kFieldNameIp].GetString();
       port = (*searchResponse)[kFieldNamePort].GetInt();
       // create and return net endpoint address
-      endpoint = std::make_shared<rtRemoteNetAddress>(scheme, host, port);
+      endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, port);
     }
   }
 

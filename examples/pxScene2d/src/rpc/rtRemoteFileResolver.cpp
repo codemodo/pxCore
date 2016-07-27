@@ -124,12 +124,12 @@ rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteEndpointPtr&
   {
     rapidjson::Value *ip = rapidjson::Pointer("/" + name + "/" + kFieldNameIp).Get(doc);
     rapidjson::Value *port = rapidjson::Pointer("/" + name + "/" + kFieldNamePort).Get(doc);
-    endpoint = std::make_shared<rtRemoteNetAddress>(scheme->GetString(), ip->GetString(), port->GetInt());
+    endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme->GetString(), ip->GetString(), port->GetInt());
   }
   else if (strcmp(epType->GetString(), kEndpointTypeLocal) == 0)
   {
     rapidjson::Value *path = rapidjson::Pointer("/" + name + "/" + kFieldNamePath).Get(doc);
-    endpoint = std::make_shared<rtRemoteLocalAddress>(scheme->GetString(), path->GetString());
+    endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme->GetString(), path->GetString());
   }
   else
   {

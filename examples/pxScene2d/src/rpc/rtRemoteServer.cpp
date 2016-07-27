@@ -508,7 +508,7 @@ rtRemoteServer::openRpcListener()
   
   // set options
   fcntl(m_endpoint_server->fd(), F_SETFD, fcntl(m_endpoint_server->fd(), F_GETFD) | FD_CLOEXEC);
-  if (!dynamic_pointer_cast<rtRemoteLocalAddress>(m_endpoint))
+  if (!dynamic_pointer_cast<rtRemoteEndpointLocal>(m_endpoint))
   {
     uint32_t one = 1;
     if (-1 == setsockopt(m_endpoint_server->fd(), SOL_TCP, TCP_NODELAY, &one, sizeof(one)))

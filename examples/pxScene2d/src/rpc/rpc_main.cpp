@@ -272,10 +272,11 @@ int main(int argc, char* /*argv*/[])
   // runs separate name server which communicates with resolver
   if (argc == 3)
   {
-    rtError e = rtRemoteInitNs(env);
+    rtRemoteNameService ns(env);
+    rtError e = ns.init();
     RT_ASSERT(e == RT_OK);
     while(1);
-    rtRemoteShutdownNs(env);
+    ns.close();
     return 0;
   }
   else

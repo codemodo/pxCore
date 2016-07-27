@@ -13,7 +13,6 @@
 
 #include <rtLog.h>
 
-static rtRemoteNameService* gNs = nullptr;
 static std::mutex gMutex;
 static rtRemoteEnvironment* gEnv = nullptr;
 
@@ -33,7 +32,8 @@ rtRemoteEnvironment::rtRemoteEnvironment(rtRemoteConfig* config)
   ObjectCache = new rtObjectCache(this);
 
   Factory = new rtRemoteFactory(this);
-  Factory->registerFunctionCreateAddress("tcp", &rtRemoteFactory::onCreateAddressTcp);
+  rtRemoteRegisterEndpointFactory(this, "tcp", &rtRemoteFactory::onCreateAddressTcp);
+  rtRemoteRegisterEndpointFactory(this, "udp", &rtRemoteFactory::onCreateAddressUdp);
 }
 
 rtRemoteEnvironment::~rtRemoteEnvironment()
@@ -101,20 +101,6 @@ rtRemoteInit(rtRemoteEnvironment* env)
   return e;
 }
 
-rtError
-rtRemoteInitNs(rtRemoteEnvironment* env)
-{
-  rtError e = RT_OK;
-  //rtRemoteConfig::getInstance();
-  if (gNs == nullptr)
-  {
-    gNs = new rtRemoteNameService(env);
-    e = gNs->init();
-  }
-
-  return e;
-}
-
 extern rtError rtRemoteShutdownStreamSelector();
 
 rtError
@@ -140,17 +126,6 @@ rtRemoteShutdown(rtRemoteEnvironment* env)
   }
 
   return e;
-}
-
-rtError
-rtRemoteShutdownNs()
-{
-  if (gNs)
-  {
-    delete gNs;
-    gNs = nullptr;
-  }
-  return RT_OK;
 }
 
 rtError

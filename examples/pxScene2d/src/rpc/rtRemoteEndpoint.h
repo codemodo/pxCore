@@ -20,9 +20,6 @@
 #include "rtSocketUtils.h"
 #include "rtRemoteEndpoint.h"
 
-
-
-
 /* Abstract base class for endpoint addresses */
 class rtRemoteIEndpoint
 {
@@ -39,11 +36,14 @@ protected:
 	std::string m_scheme;
 };
 
-/* Local endpoint addresses */
-class rtRemoteLocalAddress : public virtual rtRemoteIEndpoint
+/* Local endpoints.
+ * Used to stored address information for unix domain sockets,
+ * named pipes, files, shared memory, etc.
+ */
+class rtRemoteEndpointLocal : public virtual rtRemoteIEndpoint
 {
 public:
-	rtRemoteLocalAddress(std::string const& scheme, std::string const& path);
+	rtRemoteEndpointLocal(std::string const& scheme, std::string const& path);
 	
 	virtual std::string toUri() override;
 
@@ -56,11 +56,14 @@ protected:
 	std::string m_path;
 };
 
-/* Remote endpoint addresses */
-class rtRemoteNetAddress : public virtual rtRemoteIEndpoint
+/* Remote endpoints.
+ * Used to stored address information for remote sockets
+ * (tcp, udp, http, etc.)
+ */
+class rtRemoteEndpointRemote : public virtual rtRemoteIEndpoint
 {
 public:
-  rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port);
+  rtRemoteEndpointRemote(std::string const& scheme, std::string const& host, int port);
 	
 	virtual std::string toUri() override;
 
@@ -75,19 +78,18 @@ protected:
 	int                 m_port;
 };
 
-/* Remote endpoint addresses with path */
-class rtRemoteDistributedAddress : public rtRemoteNetAddress, public rtRemoteLocalAddress
+/* Remote endpoints that include path information*/
+class rtRemoteEndpointDistributed : public rtRemoteEndpointRemote, public rtRemoteEndpointLocal
 {
 public:
-	rtRemoteDistributedAddress(std::string const& scheme, std::string const& host, int port, std::string const& path);
+	rtRemoteEndpointDistributed(std::string const& scheme, std::string const& host, int port, std::string const& path);
 	virtual std::string toUri() override;
 };
 
 
 
-
 /////////////////////////
-// Endpoint abstractions                 
+// Endpoint handles                 
 /////////////////////////
 
 class rtRemoteIEndpointHandle

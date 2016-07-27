@@ -77,7 +77,7 @@ rtRemoteParseCastType(std::string const& host, NetType const& net_type, CastType
 rtError
 rtRemoteEndpointAddressToSocket(rtRemoteEndpointPtr addr, sockaddr_storage& ss)
 {
-  if (auto local = dynamic_pointer_cast<rtRemoteLocalAddress>(addr))
+  if (auto local = dynamic_pointer_cast<rtRemoteEndpointLocal>(addr))
   {
     if (!local->isSocket())
     {
@@ -86,7 +86,7 @@ rtRemoteEndpointAddressToSocket(rtRemoteEndpointPtr addr, sockaddr_storage& ss)
     }
     return rtParseAddress(ss, local->path().c_str(), 0, nullptr);
   }
-  else if (auto net = dynamic_pointer_cast<rtRemoteNetAddress>(addr))
+  else if (auto net = dynamic_pointer_cast<rtRemoteEndpointRemote>(addr))
   {
     return rtParseAddress(ss, net->host().c_str(), net->port(), nullptr);
   }
@@ -130,7 +130,7 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
   {
     strncpy(addr_buff, (const char*)addr, sizeof(addr_buff) -1);
     buff << addr_buff;
-    endpoint = std::make_shared<rtRemoteLocalAddress>(scheme, addr_buff);
+    endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, addr_buff);
     return RT_OK;
   }
   else
@@ -141,7 +141,7 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
     buff << addr_buff;
     buff << ":";
     buff << port;
-    endpoint = std::make_shared<rtRemoteNetAddress>(scheme, addr_buff, port);
+    endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, addr_buff, port);
     return RT_OK;
   }
   return RT_OK;

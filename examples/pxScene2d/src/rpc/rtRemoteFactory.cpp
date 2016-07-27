@@ -129,11 +129,11 @@ rtRemoteFactory::onCreateAddressTcp(std::string const& uri, rtRemoteEndpointPtr&
 
   if (!path.empty())
   { // local socket
-    endpoint = std::make_shared<rtRemoteLocalAddress>(scheme, path);
+    endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
   }
   else if (!host.empty() && port != nullptr)
   {
-    endpoint = std::make_shared<rtRemoteNetAddress>(scheme, host, *port);   
+    endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, *port);   
   }
   return RT_OK;
 }
@@ -171,7 +171,7 @@ rtRemoteFactory::onCreateAddressUdp(std::string const& uri, rtRemoteEndpointPtr&
   if (ch == '/' || ch == '.')
   { // local socket
     std::string path = uri.substr(index, std::string::npos);
-    endpoint = std::make_shared<rtRemoteLocalAddress>(scheme, path);
+    endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
   }
   else
   { // network socket
@@ -196,7 +196,7 @@ rtRemoteFactory::onCreateAddressUdp(std::string const& uri, rtRemoteEndpointPtr&
     std::string host;
     host = uri.substr(index, index_port - index);
 
-    endpoint = std::make_shared<rtRemoteNetAddress>(scheme, host, port);   
+    endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, port);   
   }
   return RT_OK;
 }
