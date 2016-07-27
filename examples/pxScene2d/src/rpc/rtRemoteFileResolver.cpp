@@ -59,7 +59,7 @@ rtRemoteFileResolver::open()
 }
 
 rtError
-rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteAddrPtr /*endpoint_address*/)
+rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteEndpointPtr /*endpoint*/)
 {
   if (m_db_fp == nullptr)
   {
@@ -94,7 +94,7 @@ rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteAddrPtr /*
 }
 
 rtError
-rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteAddrPtr& endpoint_address,
+rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteEndpointPtr& endpoint,
     uint32_t)
 {
   if (m_db_fp == nullptr)
@@ -124,12 +124,12 @@ rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteAddrPtr& end
   {
     rapidjson::Value *ip = rapidjson::Pointer("/" + name + "/" + kFieldNameIp).Get(doc);
     rapidjson::Value *port = rapidjson::Pointer("/" + name + "/" + kFieldNamePort).Get(doc);
-    endpoint_address = std::make_shared<rtRemoteNetAddress>(scheme->GetString(), ip->GetString(), port->GetInt());
+    endpoint = std::make_shared<rtRemoteNetAddress>(scheme->GetString(), ip->GetString(), port->GetInt());
   }
   else if (strcmp(epType->GetString(), kEndpointTypeLocal) == 0)
   {
     rapidjson::Value *path = rapidjson::Pointer("/" + name + "/" + kFieldNamePath).Get(doc);
-    endpoint_address = std::make_shared<rtRemoteLocalAddress>(scheme->GetString(), path->GetString());
+    endpoint = std::make_shared<rtRemoteLocalAddress>(scheme->GetString(), path->GetString());
   }
   else
   {

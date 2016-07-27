@@ -19,15 +19,15 @@
 #include <dirent.h>
 
 // BASE //
-rtRemoteIAddress::rtRemoteIAddress(std::string const& scheme)
+rtRemoteIEndpoint::rtRemoteIEndpoint(std::string const& scheme)
   : m_scheme(scheme)
 { }
 
-rtRemoteIAddress::~rtRemoteIAddress() { }
+rtRemoteIEndpoint::~rtRemoteIEndpoint() { }
 
 // LOCAL //
 rtRemoteLocalAddress::rtRemoteLocalAddress(std::string const& scheme, std::string const& path)
-  : rtRemoteIAddress(scheme)
+  : rtRemoteIEndpoint(scheme)
   , m_path(path)
 { }
 
@@ -50,7 +50,7 @@ rtRemoteLocalAddress::toUri()
 // NETWORK //
 
 rtRemoteNetAddress::rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port)
-  : rtRemoteIAddress(scheme)
+  : rtRemoteIEndpoint(scheme)
   , m_host(host)
   , m_port(port)
 { }
@@ -69,7 +69,7 @@ rtRemoteNetAddress::toUri()
 
 // NETWORK + PATH
 rtRemoteDistributedAddress::rtRemoteDistributedAddress(std::string const& scheme, std::string const& host, int port, std::string const& path)
-  : rtRemoteIAddress(scheme)
+  : rtRemoteIEndpoint(scheme)
   , rtRemoteNetAddress(scheme, host, port)
   , rtRemoteLocalAddress(scheme, path)
 { }
@@ -92,22 +92,22 @@ rtRemoteDistributedAddress::toUri()
 // Endpoint abstractions                 
 /////////////////////////
 
-rtRemoteIEndpoint::rtRemoteIEndpoint(rtRemoteAddrPtr ep_addr)
-: m_addr(ep_addr)
+rtRemoteIEndpointHandle::rtRemoteIEndpointHandle(rtRemoteEndpointPtr endpoint)
+: m_addr(endpoint)
 , m_fd(-1)
 {
   // empty
 }
 
-rtRemoteIEndpoint::~rtRemoteIEndpoint()
+rtRemoteIEndpointHandle::~rtRemoteIEndpointHandle()
 {
   if (m_fd != -1)
     ::close(m_fd);
   m_fd = -1;
 }
 
-rtRemoteStreamServerEndpoint::rtRemoteStreamServerEndpoint(rtRemoteAddrPtr ep_addr)
-: rtRemoteIEndpoint(ep_addr)
+rtRemoteStreamServerEndpoint::rtRemoteStreamServerEndpoint(rtRemoteEndpointPtr endpoint)
+: rtRemoteIEndpointHandle(endpoint)
 {
   memset(&m_socket, 0, sizeof(sockaddr_storage));
 }
@@ -185,7 +185,7 @@ rtRemoteStreamServerEndpoint::doListen()
 }
 
 rtError
-rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteAddrPtr& remote_addr)
+rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteEndpointPtr& remote_addr)
 {
   sockaddr_storage remote_endpoint;
   memset(&remote_endpoint, 0, sizeof(remote_endpoint));
@@ -217,7 +217,7 @@ rtRemoteStreamServerEndpoint::receive(int /*fd*/)
 }
 /*
 rtRemoteStreamClientEndpoint::rtRemoteStreamClientEndpoint(const rtRemoteIAddress* const addr)
-: rtRemoteIEndpoint(addr)
+: rtRemoteIEndpointHandle(addr)
 {
   // TODO
 }
@@ -237,7 +237,7 @@ rtRemoteStreamClientEndpoint::close()
 }
 
 rtRemoteDatagramServerEndpoint::rtRemoteDatagramServerEndpoint(const rtRemoteIAddress* const addr)
-: rtRemoteIEndpoint(addr)
+: rtRemoteIEndpointHandle(addr)
 {
   // TODO
 }
@@ -258,7 +258,7 @@ rtRemoteDatagramServerEndpoint::close()
 
 
 rtRemoteDatagramClientEndpoint::rtRemoteDatagramClientEndpoint(const rtRemoteIAddress* const addr)
-: rtRemoteIEndpoint(addr)
+: rtRemoteIEndpointHandle(addr)
 {
   // TODO
 }
@@ -279,7 +279,7 @@ rtRemoteDatagramClientEndpoint::close()
 
 
 rtRemoteSharedMemoryEndpoint::rtRemoteSharedMemoryEndpoint(const rtRemoteIAddress* const addr)
-: rtRemoteIEndpoint(addr)
+: rtRemoteIEndpointHandle(addr)
 {
   // TODO
 }
@@ -299,8 +299,8 @@ rtRemoteSharedMemoryEndpoint::close()
 }
 
 
-rtRemoteFileEndpoint::rtRemoteFileEndpoint(const rtRemoteIAddress* const addr)
-: rtRemoteIEndpoint(addr)
+rtRemoteFileEndpoint::rtRemoteFileEndpoint(const rtRemoteIEndpoint* const addr)
+: rtRemoteIEndpointHandle(addr)
 {
   // TODO
 }
@@ -321,7 +321,7 @@ rtRemoteFileEndpoint::close()
 
 
 rtRemoteNamedPipeEndpoint::rtRemoteNamedPipeEndpoint(const rtRemoteIAddress* const addr)
-: rtRemoteIEndpoint(addr)
+: rtRemoteIEndpointHandle(addr)
 {
   // TODO
 }

@@ -184,8 +184,8 @@ rtRemoteNameService::onRegister(rtJsonDocPtr const& doc, sockaddr_storage const&
   RT_ASSERT(doc->HasMember(kFieldNameIp));
   RT_ASSERT(doc->HasMember(kFieldNamePort));
   
-  sockaddr_storage endpoint;
-  rtError err = rtParseAddress(endpoint, (*doc)[kFieldNameIp].GetString(),
+  sockaddr_storage endpoint_sockaddr;
+  rtError err = rtParseAddress(endpoint_sockaddr, (*doc)[kFieldNameIp].GetString(),
                 (*doc)[kFieldNamePort].GetInt(), nullptr);
 
   if (err != RT_OK)
@@ -194,7 +194,7 @@ rtRemoteNameService::onRegister(rtJsonDocPtr const& doc, sockaddr_storage const&
   char const* objectId = rtMessage_GetObjectId(*doc);
   
   std::unique_lock<std::mutex> lock(m_mutex);
-  m_registered_objects[objectId] = endpoint;
+  m_registered_objects[objectId] = endpoint_sockaddr;
   lock.unlock();
   return RT_OK;
 }
@@ -238,20 +238,20 @@ rtRemoteNameService::onLookup(rtJsonDocPtr const& doc, sockaddr_storage const& s
   { // object is registered
 
     // get IP and port
-    sockaddr_storage endpoint = itr->second;
+    sockaddr_storage endpoint_sockaddr = itr->second;
     std::string       ep_addr;
     uint16_t          ep_port;
     char buff[128];
 
     void* addr = nullptr;
-    rtGetInetAddr(endpoint, &addr);
+    rtGetInetAddr(endpoint_sockaddr, &addr);
 
     socklen_t len;
-    rtSocketGetLength(endpoint, &len);
-    char const* p = inet_ntop(endpoint.ss_family, addr, buff, len);
+    rtSocketGetLength(endpoint_sockaddr, &len);
+    char const* p = inet_ntop(endpoint_sockaddr.ss_family, addr, buff, len);
     if (p)
       ep_addr = p;
-    rtGetPort(endpoint, &ep_port);
+    rtGetPort(endpoint_sockaddr, &ep_port);
 
     // create and send response
     rapidjson::Document doc;

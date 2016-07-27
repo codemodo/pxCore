@@ -24,8 +24,8 @@ public:
 public:
   virtual rtError open() override;
   virtual rtError close() override;
-  virtual rtError registerObject(std::string const& name, rtRemoteAddrPtr endpoint_address) override;
-  virtual rtError locateObject(std::string const& name, rtRemoteAddrPtr& endpoint_address,
+  virtual rtError registerObject(std::string const& name, rtRemoteEndpointPtr endpoint) override;
+  virtual rtError locateObject(std::string const& name, rtRemoteEndpointPtr& endpoint,
     uint32_t timeout) override;
 
 private:

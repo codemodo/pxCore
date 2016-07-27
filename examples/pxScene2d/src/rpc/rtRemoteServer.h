@@ -68,7 +68,7 @@ private:
   using CommandHandlerMap = std::map< std::string, rtRemoteMessageHandler >;
   using ObjectRefeMap = std::map< std::string, ObjectReference >;
 
-  rtRemoteAddrPtr               m_endpoint_addr;
+  rtRemoteEndpointPtr           m_endpoint;
   rtRemoteStreamServerEndpoint* m_endpoint_server;
 
   std::unique_ptr<std::thread>  m_thread;

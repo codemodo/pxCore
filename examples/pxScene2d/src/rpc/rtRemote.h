@@ -61,7 +61,7 @@ rtRemoteLocateObject(rtRemoteEnvironment* env, char const* id, rtObjectRef& obj)
  */
 rtError
 rtRemoteRegisterEndpointFactory(rtRemoteEnvironment* env, std::string const& scheme,
-  rtError (*func) (std::string const&, rtRemoteAddrPtr&) );
+  rtError (*func) (std::string const&, rtRemoteEndpointPtr&) );
 
 /**
  * Shutdown rtRemote sub-system

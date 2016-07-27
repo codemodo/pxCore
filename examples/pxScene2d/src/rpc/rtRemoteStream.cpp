@@ -131,7 +131,7 @@ rtRemoteStreamSelector::pollFds()
   return RT_OK;
 }
 
-rtRemoteStream::rtRemoteStream(rtRemoteEnvPtr env, int fd, rtRemoteAddrPtr const& local_endpoint, rtRemoteAddrPtr const& remote_endpoint)
+rtRemoteStream::rtRemoteStream(rtRemoteEnvPtr env, int fd, rtRemoteEndpointPtr const& local_endpoint, rtRemoteEndpointPtr const& remote_endpoint)
   : m_fd(fd)
   , m_last_message_time(0)
   , m_last_ka_message_time(0)
@@ -243,12 +243,12 @@ rtRemoteStream::connect()
 }
 
 rtError
-rtRemoteStream::connectTo(rtRemoteAddrPtr const& addr)
+rtRemoteStream::connectTo(rtRemoteEndpointPtr const& addr)
 {
-  sockaddr_storage endpoint;
-  memset(&endpoint, 0, sizeof(endpoint));
-  rtRemoteEndpointAddressToSocket(addr, endpoint);
-  m_fd = socket(endpoint.ss_family, SOCK_STREAM, 0);
+  sockaddr_storage endpoint_sockaddr;
+  memset(&endpoint_sockaddr, 0, sizeof(endpoint_sockaddr));
+  rtRemoteEndpointAddressToSocket(addr, endpoint_sockaddr);
+  m_fd = socket(endpoint_sockaddr.ss_family, SOCK_STREAM, 0);
   if (m_fd < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -257,7 +257,7 @@ rtRemoteStream::connectTo(rtRemoteAddrPtr const& addr)
   }
   fcntl(m_fd, F_SETFD, fcntl(m_fd, F_GETFD) | FD_CLOEXEC);
 
-  if (endpoint.ss_family != AF_UNIX)
+  if (endpoint_sockaddr.ss_family != AF_UNIX)
   {
     uint32_t one = 1;
     if (-1 == setsockopt(m_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
@@ -265,9 +265,9 @@ rtRemoteStream::connectTo(rtRemoteAddrPtr const& addr)
   }
 
   socklen_t len;
-  rtSocketGetLength(endpoint, &len);
+  rtSocketGetLength(endpoint_sockaddr, &len);
 
-  int ret = ::connect(m_fd, reinterpret_cast<sockaddr const *>(&endpoint), len);
+  int ret = ::connect(m_fd, reinterpret_cast<sockaddr const *>(&endpoint_sockaddr), len);
   if (ret < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -275,9 +275,6 @@ rtRemoteStream::connectTo(rtRemoteAddrPtr const& addr)
     rtCloseSocket(m_fd);
     return e;
   }
-
-  //rtGetSockName(m_fd, m_local_endpoint);
-  //rtGetPeerName(m_fd, m_remote_endpoint);
 
   if (m_local_endpoint)
   {

@@ -24,11 +24,11 @@
 
 
 /* Abstract base class for endpoint addresses */
-class rtRemoteIAddress
+class rtRemoteIEndpoint
 {
 public:
-	rtRemoteIAddress(std::string const& scheme);
-	virtual ~rtRemoteIAddress();
+	rtRemoteIEndpoint(std::string const& scheme);
+	virtual ~rtRemoteIEndpoint();
 
 	virtual std::string toUri() = 0;
 
@@ -40,7 +40,7 @@ protected:
 };
 
 /* Local endpoint addresses */
-class rtRemoteLocalAddress : public virtual rtRemoteIAddress
+class rtRemoteLocalAddress : public virtual rtRemoteIEndpoint
 {
 public:
 	rtRemoteLocalAddress(std::string const& scheme, std::string const& path);
@@ -57,7 +57,7 @@ protected:
 };
 
 /* Remote endpoint addresses */
-class rtRemoteNetAddress : public virtual rtRemoteIAddress
+class rtRemoteNetAddress : public virtual rtRemoteIEndpoint
 {
 public:
   rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port);
@@ -90,16 +90,16 @@ public:
 // Endpoint abstractions                 
 /////////////////////////
 
-class rtRemoteIEndpoint
+class rtRemoteIEndpointHandle
 {
 public:
-  virtual ~rtRemoteIEndpoint();
+  virtual ~rtRemoteIEndpointHandle();
 
   /* Should create fd */
   virtual rtError open() = 0;
 	virtual rtError close() = 0;
   
-  // inline rtRemoteIAddress address() const
+  // inline rtRemoteIEndpoint address() const
   //   { return *m_addr; }
   
   inline int fd() const
@@ -109,8 +109,8 @@ public:
 	  { m_fd = fd; }
 
 protected:
-  rtRemoteIEndpoint(rtRemoteAddrPtr ep_addr);
-  rtRemoteAddrPtr m_addr;
+  rtRemoteIEndpointHandle(rtRemoteEndpointPtr endpoint);
+  rtRemoteEndpointPtr m_addr;
   int m_fd;
 };
 
@@ -121,10 +121,10 @@ class rtRemoteIStreamEndpoint
 	virtual rtError receive(int fd) = 0;
 };
 
-class rtRemoteStreamServerEndpoint : public virtual rtRemoteIEndpoint, public rtRemoteIStreamEndpoint
+class rtRemoteStreamServerEndpoint : public virtual rtRemoteIEndpointHandle, public rtRemoteIStreamEndpoint
 {
 public:
-  rtRemoteStreamServerEndpoint(rtRemoteAddrPtr ep_addr);
+  rtRemoteStreamServerEndpoint(rtRemoteEndpointPtr endpoint);
   
   virtual rtError open() override;
 	virtual rtError close() override;
@@ -132,7 +132,7 @@ public:
 	virtual rtError receive(int fd) override;
 	rtError doBind();
 	rtError doListen();
-	rtError doAccept(int& new_fd, rtRemoteAddrPtr& remote_addr);
+	rtError doAccept(int& new_fd, rtRemoteEndpointPtr& remote_addr);
 
 	inline sockaddr_storage sockaddr() const
 	  { return m_socket; }
@@ -140,7 +140,7 @@ public:
 	sockaddr_storage m_socket;
 };
 /*
-class rtRemoteStreamClientEndpoint : public virtual rtRemoteIEndpoint, public rtRemoteIStreamEndpoint
+class rtRemoteStreamClientEndpoint : public virtual rtRemoteIEndpointHandle, public rtRemoteIStreamEndpoint
 {
 public:
   rtRemoteStreamClientEndpoint(const rtRemoteIAddress* const addr);
@@ -150,7 +150,7 @@ public:
 	//virtual rtError receive(int fd) override;
 };
 
-class rtRemoteDatagramServerEndpoint : public virtual rtRemoteIEndpoint
+class rtRemoteDatagramServerEndpoint : public virtual rtRemoteIEndpointHandle
 {
 public:
   rtRemoteDatagramServerEndpoint(const rtRemoteIAddress* const addr);
@@ -161,7 +161,7 @@ public:
 	// rtError receive();
 };
 
-class rtRemoteDatagramClientEndpoint : public virtual rtRemoteIEndpoint
+class rtRemoteDatagramClientEndpoint : public virtual rtRemoteIEndpointHandle
 {
 public:
   rtRemoteDatagramClientEndpoint(const rtRemoteIAddress* const addr);
@@ -170,7 +170,7 @@ public:
 	// rtError send();
 };
 
-class rtRemoteSharedMemoryEndpoint : public virtual rtRemoteIEndpoint
+class rtRemoteSharedMemoryEndpoint : public virtual rtRemoteIEndpointHandle
 {
 public:
   rtRemoteSharedMemoryEndpoint(const rtRemoteIAddress* const addr);
@@ -178,7 +178,7 @@ public:
 	virtual rtError close() override;
 };
 
-class rtRemoteFileEndpoint : public virtual rtRemoteIEndpoint
+class rtRemoteFileEndpoint : public virtual rtRemoteIEndpointHandle
 {
 public:
   rtRemoteFileEndpoint(const rtRemoteIAddress* const addr);
@@ -186,7 +186,7 @@ public:
 	virtual rtError close() override;
 };
 
-class rtRemoteNamedPipeEndpoint : public virtual rtRemoteIEndpoint
+class rtRemoteNamedPipeEndpoint : public virtual rtRemoteIEndpointHandle
 {
 public:
   rtRemoteNamedPipeEndpoint(const rtRemoteIAddress* const addr);

@@ -44,7 +44,7 @@ rtRemoteFactory::~rtRemoteFactory()
 }
 
 rtError
-rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteAddrPtr&))
+rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteEndpointPtr&))
 {
   if (m_command_handlers.find(scheme) != m_command_handlers.end())
   {
@@ -56,7 +56,7 @@ rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtErro
 }
 
 rtError
-rtRemoteFactory::updateFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteAddrPtr&))
+rtRemoteFactory::updateFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteEndpointPtr&))
 {
   m_command_handlers.insert(AddrCommandHandlerMap::value_type(scheme, f));
   return RT_OK;
@@ -86,7 +86,7 @@ rtRemoteFactory::createResolver(rtRemoteResolverPtr& resolver)
 }
 
 rtError
-rtRemoteFactory::createAddress(std::string const& uri, rtRemoteAddrPtr& endpoint_addr)
+rtRemoteFactory::createAddress(std::string const& uri, rtRemoteEndpointPtr& endpoint)
 {
   std::string scheme = uri.substr(0, uri.find(":"));
   
@@ -96,12 +96,11 @@ rtRemoteFactory::createAddress(std::string const& uri, rtRemoteAddrPtr& endpoint
     rtLogError("no command handler registered for: %s", scheme.c_str());
     return RT_FAIL;
   }
-  return itr->second(uri, endpoint_addr);
-  //return CALL_MEMBER_FN(*this, itr->second)(uri, endpoint_addr);
+  return itr->second(uri, endpoint);
 }
 
 rtError
-rtRemoteFactory::onCreateAddressTcp(std::string const& uri, rtRemoteAddrPtr& endpoint_addr)
+rtRemoteFactory::onCreateAddressTcp(std::string const& uri, rtRemoteEndpointPtr& endpoint)
 {
   std::string scheme;
   std::string path;
@@ -130,11 +129,11 @@ rtRemoteFactory::onCreateAddressTcp(std::string const& uri, rtRemoteAddrPtr& end
 
   if (!path.empty())
   { // local socket
-    endpoint_addr = std::make_shared<rtRemoteLocalAddress>(scheme, path);
+    endpoint = std::make_shared<rtRemoteLocalAddress>(scheme, path);
   }
   else if (!host.empty() && port != nullptr)
   {
-    endpoint_addr = std::make_shared<rtRemoteNetAddress>(scheme, host, *port);   
+    endpoint = std::make_shared<rtRemoteNetAddress>(scheme, host, *port);   
   }
   return RT_OK;
 }
@@ -142,7 +141,7 @@ rtRemoteFactory::onCreateAddressTcp(std::string const& uri, rtRemoteAddrPtr& end
 // TODO potentially could modularize since this is virtually identical to tcp
 // Other schemes (file, shmem, etc.) will obviously differ in more meaningful ways
 rtError
-rtRemoteFactory::onCreateAddressUdp(std::string const& uri, rtRemoteAddrPtr& endpoint_addr)
+rtRemoteFactory::onCreateAddressUdp(std::string const& uri, rtRemoteEndpointPtr& endpoint)
 {
   size_t index = uri.find("://");
   if (index == std::string::npos)
@@ -172,7 +171,7 @@ rtRemoteFactory::onCreateAddressUdp(std::string const& uri, rtRemoteAddrPtr& end
   if (ch == '/' || ch == '.')
   { // local socket
     std::string path = uri.substr(index, std::string::npos);
-    endpoint_addr = std::make_shared<rtRemoteLocalAddress>(scheme, path);
+    endpoint = std::make_shared<rtRemoteLocalAddress>(scheme, path);
   }
   else
   { // network socket
@@ -197,7 +196,7 @@ rtRemoteFactory::onCreateAddressUdp(std::string const& uri, rtRemoteAddrPtr& end
     std::string host;
     host = uri.substr(index, index_port - index);
 
-    endpoint_addr = std::make_shared<rtRemoteNetAddress>(scheme, host, port);   
+    endpoint = std::make_shared<rtRemoteNetAddress>(scheme, host, port);   
   }
   return RT_OK;
 }

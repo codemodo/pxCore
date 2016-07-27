@@ -80,13 +80,13 @@ rtRemoteUnicastResolver::open()
 }
 
 rtError
-rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteAddrPtr endpoint_address)
+rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteEndpointPtr endpoint)
 {
-    return registerObject(name, endpoint_address, 3000);
+    return registerObject(name, endpoint, 3000);
 }
 
 rtError
-rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteAddrPtr endpoint_address, uint32_t timeout)
+rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteEndpointPtr endpoint, uint32_t timeout)
 {
   if (m_static_fd == -1)
   {
@@ -94,21 +94,21 @@ rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteAddrPtr
     return RT_FAIL;
   }
 
-  sockaddr_storage endpoint;
-  rtRemoteEndpointAddressToSocket(endpoint_address, endpoint);
+  sockaddr_storage endpoint_sockaddr;
+  rtRemoteEndpointAddressToSocket(endpoint, endpoint_sockaddr);
 
   std::string rpc_addr;
   uint16_t rpc_port;
   char buff[128];
   void* addr = nullptr;
-  rtGetInetAddr(endpoint, &addr);
+  rtGetInetAddr(endpoint_sockaddr, &addr);
   
   socklen_t len;
-  rtSocketGetLength(endpoint, &len);
-  char const* p = inet_ntop(endpoint.ss_family, addr, buff, len);
+  rtSocketGetLength(endpoint_sockaddr, &len);
+  char const* p = inet_ntop(endpoint_sockaddr.ss_family, addr, buff, len);
   if (p)
     rpc_addr = p;
-  rtGetPort(endpoint, &rpc_port);
+  rtGetPort(endpoint_sockaddr, &rpc_port);
 
   rtError err = RT_OK;
   rtCorrelationKey seqId = rtMessage_GetNextCorrelationKey();
@@ -177,7 +177,7 @@ rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteAddrPtr
 }
 
 rtError
-rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteAddrPtr& endpoint_address,
+rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteEndpointPtr& endpoint,
     uint32_t timeout)
 {
   if (m_static_fd == -1)
@@ -249,7 +249,7 @@ rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteAddrPtr& 
           std::string scheme, path;
           scheme = (*searchResponse)[kFieldNameScheme].GetString();
           path = (*searchResponse)[kFieldNamePath].GetString();
-          endpoint_address = std::make_shared<rtRemoteLocalAddress>(scheme, path);
+          endpoint = std::make_shared<rtRemoteLocalAddress>(scheme, path);
         }
         else
         {
@@ -260,7 +260,7 @@ rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteAddrPtr& 
           scheme = (*searchResponse)[kFieldNameScheme].GetString();
           host = (*searchResponse)[kFieldNameIp].GetString();
           port = (*searchResponse)[kFieldNamePort].GetInt();
-          endpoint_address = std::make_shared<rtRemoteNetAddress>(scheme, host, port);
+          endpoint = std::make_shared<rtRemoteNetAddress>(scheme, host, port);
         }
       }
     }

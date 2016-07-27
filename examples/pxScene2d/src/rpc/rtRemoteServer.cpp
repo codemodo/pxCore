@@ -269,7 +269,7 @@ rtRemoteServer::registerObject(std::string const& name, rtObjectRef const& obj)
   rtObjectRef ref = m_env->ObjectCache->findObject(name);
   if (!ref)
     m_env->ObjectCache->insert(name, obj, -1);
-  m_resolver->registerObject(name, m_endpoint_addr);
+  m_resolver->registerObject(name, m_endpoint);
   return RT_OK;
 }
 
@@ -319,12 +319,12 @@ rtRemoteServer::runListener()
     if (FD_ISSET(m_endpoint_server->fd(), &read_fds))
     {
       // accept connection and retrieve connecting address and new fd created for this connection
-      std::shared_ptr<rtRemoteIAddress> remote_addr;
+      std::shared_ptr<rtRemoteIEndpoint> remote_addr;
       int new_fd;
       m_endpoint_server->doAccept(new_fd, remote_addr);
 
       // retrieve address information for new fd 
-      std::shared_ptr<rtRemoteIAddress> local_addr;
+      std::shared_ptr<rtRemoteIEndpoint> local_addr;
       sockaddr_storage local_sock;
       memset(&local_sock, 0, sizeof(local_sock));
       rtGetSockName(m_endpoint_server->fd(), local_sock);
@@ -407,19 +407,19 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
   // if object is not registered with us locally, then check network
   if (!obj)
   {
-    std::shared_ptr<rtRemoteIAddress> object_addr;
-    err = m_resolver->locateObject(name, object_addr, timeout);
+    std::shared_ptr<rtRemoteIEndpoint> object_endpoint;
+    err = m_resolver->locateObject(name, object_endpoint, timeout);
     //TODO get rid of once same_endpoint changed
-    sockaddr_storage rpc_endpoint;
-    rtRemoteEndpointAddressToSocket(object_addr, rpc_endpoint);
+    sockaddr_storage object_sockaddr;
+    rtRemoteEndpointAddressToSocket(object_endpoint, object_sockaddr);
 
     rtLogDebug("object %s found at endpoint: %s", name.c_str(),
-      object_addr->toUri().c_str());
+      object_endpoint->toUri().c_str());
 
     if (err == RT_OK)
     {
       std::shared_ptr<rtRemoteClient> client;
-      std::string const endpointName = object_addr->toUri();
+      std::string const endpointName = object_endpoint->toUri();
 
       std::unique_lock<std::mutex> lock(m_mutex);
       auto itr = m_object_map.find(endpointName);
@@ -434,7 +434,7 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
         memset(&tmp, 0, sizeof(tmp));
         //TODO get rid of line below, write new same_endpoint func
         rtRemoteEndpointAddressToSocket(i.second->getRemoteEndpoint(), tmp);
-        if (same_endpoint(tmp, rpc_endpoint))
+        if (same_endpoint(tmp, object_sockaddr))
         {
           client = i.second;
           break;
@@ -444,7 +444,7 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
 
       if (!client)
       {
-        client.reset(new rtRemoteClient(m_env, object_addr));
+        client.reset(new rtRemoteClient(m_env, object_endpoint));
         client->setMessageCallback(std::bind(&rtRemoteServer::onIncomingMessage, this, 
               std::placeholders::_1, std::placeholders::_2));
         err = client->open();
@@ -490,13 +490,13 @@ rtRemoteServer::openRpcListener()
     return e;
   }
 
-  // populate rtRemoteIAddress member object
-  rtRemoteSocketToEndpointAddress(endpoint_sockaddr, ConnType::STREAM, m_endpoint_addr);
+  // populate rtRemoteIEndpoint member object
+  rtRemoteSocketToEndpointAddress(endpoint_sockaddr, ConnType::STREAM, m_endpoint);
 
   // create server handle
   if (m_endpoint_server)
     delete m_endpoint_server;
-  m_endpoint_server = new rtRemoteStreamServerEndpoint(m_endpoint_addr);
+  m_endpoint_server = new rtRemoteStreamServerEndpoint(m_endpoint);
 
   // initialize endpoint socket
   e = m_endpoint_server->open();
@@ -508,7 +508,7 @@ rtRemoteServer::openRpcListener()
   
   // set options
   fcntl(m_endpoint_server->fd(), F_SETFD, fcntl(m_endpoint_server->fd(), F_GETFD) | FD_CLOEXEC);
-  if (!dynamic_pointer_cast<rtRemoteLocalAddress>(m_endpoint_addr))
+  if (!dynamic_pointer_cast<rtRemoteLocalAddress>(m_endpoint))
   {
     uint32_t one = 1;
     if (-1 == setsockopt(m_endpoint_server->fd(), SOL_TCP, TCP_NODELAY, &one, sizeof(one)))

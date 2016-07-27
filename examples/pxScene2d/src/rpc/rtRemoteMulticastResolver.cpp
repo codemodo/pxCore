@@ -355,7 +355,7 @@ rtRemoteMulticastResolver::onLocate(rtJsonDocPtr const& doc, sockaddr_storage co
 }
 
 rtError
-rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteAddrPtr& endpoint_address, uint32_t timeout)
+rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteEndpointPtr& endpoint, uint32_t timeout)
 {
   if (m_ucast_fd == -1)
   {
@@ -415,7 +415,7 @@ rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteAddrPtr
       std::string path;
       path = (*searchResponse)[kFieldNamePath].GetString();
       // create and return local endpoint address
-      endpoint_address = std::make_shared<rtRemoteLocalAddress>(scheme, path);
+      endpoint = std::make_shared<rtRemoteLocalAddress>(scheme, path);
     }
     else if (type.compare(kEndpointTypeNet) == 0)
     {
@@ -426,7 +426,7 @@ rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteAddrPtr
       host = (*searchResponse)[kFieldNameIp].GetString();
       port = (*searchResponse)[kFieldNamePort].GetInt();
       // create and return net endpoint address
-      endpoint_address = std::make_shared<rtRemoteNetAddress>(scheme, host, port);
+      endpoint = std::make_shared<rtRemoteNetAddress>(scheme, host, port);
     }
   }
 
@@ -565,12 +565,12 @@ rtRemoteMulticastResolver::close()
 }
 
 rtError
-rtRemoteMulticastResolver::registerObject(std::string const& name, rtRemoteAddrPtr endpoint_address)
+rtRemoteMulticastResolver::registerObject(std::string const& name, rtRemoteEndpointPtr endpoint)
 {
-  sockaddr_storage endpoint;
-  rtRemoteEndpointAddressToSocket(endpoint_address, endpoint);
+  sockaddr_storage endpoint_sockaddr;
+  rtRemoteEndpointAddressToSocket(endpoint, endpoint_sockaddr);
   std::unique_lock<std::mutex> lock(m_mutex);
-  m_hosted_objects[name] = endpoint_address;
+  m_hosted_objects[name] = endpoint;
   lock.unlock(); // TODO this wasn't here before.  Make sure it's right to put it here
   return RT_OK;
 }

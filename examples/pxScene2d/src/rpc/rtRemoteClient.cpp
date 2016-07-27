@@ -20,7 +20,7 @@
 #include <rapidjson/document.h>
 
 rtRemoteClient::rtRemoteClient(rtRemoteEnvPtr env, int fd,
-  rtRemoteAddrPtr const& local_endpoint, rtRemoteAddrPtr const& remote_endpoint)
+  rtRemoteEndpointPtr const& local_endpoint, rtRemoteEndpointPtr const& remote_endpoint)
   : m_stream(new rtRemoteStream(env, fd, local_endpoint, remote_endpoint))
   , m_message_handler(nullptr)
   , m_env(env)
@@ -31,7 +31,7 @@ rtRemoteClient::rtRemoteClient(rtRemoteEnvPtr env, int fd,
     std::placeholders::_1, std::placeholders::_2));
 }
 
-rtRemoteClient::rtRemoteClient(rtRemoteEnvPtr env, rtRemoteAddrPtr const& remote_endpoint)
+rtRemoteClient::rtRemoteClient(rtRemoteEnvPtr env, rtRemoteEndpointPtr const& remote_endpoint)
   : m_stream(new rtRemoteStream(env, -1, nullptr, remote_endpoint))
   , m_message_handler(nullptr)
   , m_env(env)

@@ -181,7 +181,7 @@ rtRemoteLocateObject(rtRemoteEnvironment* env, char const* id, rtObjectRef& obj)
 }
 
 rtError
-rtRemoteRegisterEndpointFactory(rtRemoteEnvironment* env, std::string const& scheme, rtError (*func) (std::string const&, rtRemoteAddrPtr&))
+rtRemoteRegisterEndpointFactory(rtRemoteEnvironment* env, std::string const& scheme, rtError (*func) (std::string const&, rtRemoteEndpointPtr&))
 {
   return env->Factory->registerFunctionCreateAddress(scheme, func);
 }

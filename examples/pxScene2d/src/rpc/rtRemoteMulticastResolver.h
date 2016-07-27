@@ -24,13 +24,13 @@ public:
 public:
   virtual rtError open() override;
   virtual rtError close() override;
-  virtual rtError registerObject(std::string const& name, rtRemoteAddrPtr endpoint_address) override;
-  virtual rtError locateObject(std::string const& name, rtRemoteAddrPtr& endpoint_address,
+  virtual rtError registerObject(std::string const& name, rtRemoteEndpointPtr endpoint) override;
+  virtual rtError locateObject(std::string const& name, rtRemoteEndpointPtr& endpoint,
     uint32_t timeout) override;
 
 private:
   using CommandHandler = rtError (rtRemoteMulticastResolver::*)(rtJsonDocPtr const&, sockaddr_storage const&);
-  using HostedObjectsMap = std::map< std::string, rtRemoteAddrPtr >;
+  using HostedObjectsMap = std::map< std::string, rtRemoteEndpointPtr >;
   using CommandHandlerMap = std::map< std::string, CommandHandler >;
   using RequestMap = std::map< rtCorrelationKey, rtJsonDocPtr >;
 

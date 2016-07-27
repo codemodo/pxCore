@@ -27,7 +27,7 @@ public:
   using MessageHandler = std::function<rtError (rtJsonDocPtr const& doc)>;
 
   rtRemoteStream(rtRemoteEnvPtr env, int fd,
-    rtRemoteAddrPtr const& local_endpoint, rtRemoteAddrPtr const& remote_endpoint);
+    rtRemoteEndpointPtr const& local_endpoint, rtRemoteEndpointPtr const& remote_endpoint);
   ~rtRemoteStream();
 
   rtRemoteStream(rtRemoteStream const&) = delete;
@@ -38,17 +38,17 @@ public:
 
   rtError open();
   rtError close();
-  rtError connectTo(rtRemoteAddrPtr const& endpoint);
+  rtError connectTo(rtRemoteEndpointPtr const& endpoint);
   rtError connect();
   rtError send(rtRemoteMessage const& msg);
   rtError sendRequest(rtRemoteRequest const& req, MessageHandler handler, uint32_t timeout = 1000);
   rtError setMessageCallback(MessageHandler handler);
   rtError setInactivityCallback(rtRemoteInactivityHandler handler);
 
-  inline rtRemoteAddrPtr getLocalEndpoint() const
+  inline rtRemoteEndpointPtr getLocalEndpoint() const
     { return m_local_endpoint; }
 
-  inline rtRemoteAddrPtr getRemoteEndpoint() const
+  inline rtRemoteEndpointPtr getRemoteEndpoint() const
     { return m_remote_endpoint; }
 
 private:
@@ -90,8 +90,8 @@ private:
 
   std::mutex                m_send_mutex;
   rtRemoteEnvPtr            m_env;
-  rtRemoteAddrPtr           m_local_endpoint;
-  rtRemoteAddrPtr           m_remote_endpoint;
+  rtRemoteEndpointPtr       m_local_endpoint;
+  rtRemoteEndpointPtr       m_remote_endpoint;
 };
 
 class rtRemoteStreamSelector

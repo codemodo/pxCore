@@ -23,7 +23,7 @@ class rtRemoteConfig;
 class rtRemoteStreamSelector;
 class rtObjectCache;
 class rtRemoteFactory;
-class rtRemoteIAddress;
+class rtRemoteIEndpoint;
 class rtRemoteIResolver;
 
 enum class NetType { IPV4, IPV6, ICMP, UNK };
@@ -91,7 +91,7 @@ using rtJsonDocPtr = std::shared_ptr< rapidjson::Document >;
 using rtCorrelationKey = uint32_t;
 using rtRemoteMessageHandler = std::function<rtError (std::shared_ptr<rtRemoteClient>& client, rtJsonDocPtr const& msg)>;
 using rtRemoteInactivityHandler = std::function<rtError(time_t lastMessageTime, time_t now)>;
-using rtRemoteAddrPtr = std::shared_ptr< rtRemoteIAddress >;
+using rtRemoteEndpointPtr = std::shared_ptr< rtRemoteIEndpoint >;
 using rtRemoteResolverPtr = rtRemoteIResolver*;
 
 #endif
