@@ -28,14 +28,13 @@ rtResolverTypeFromString(std::string const& resolverType)
   return t;
 };
 
-
 rtRemoteFactory::rtRemoteFactory(rtRemoteEnvironment* env)
 : m_env(env)
 , m_command_handlers()
 {
-  // empty
-  // The thought was that here we'd read in any functions specified in the config
-  // and insert them into the command handlers
+  registerFunctionCreateEndpoint("tcp", &rtRemoteFactory::onCreateEndpointTcp);
+  registerFunctionCreateEndpoint("udp", &rtRemoteFactory::onCreateEndpointUdp);
+  registerFunctionCreateEndpoint("shmem", &rtRemoteFactory::onCreateEndpointShmem);
 }
 
 rtRemoteFactory::~rtRemoteFactory()
@@ -44,7 +43,7 @@ rtRemoteFactory::~rtRemoteFactory()
 }
 
 rtError
-rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteEndpointPtr&))
+rtRemoteFactory::registerFunctionCreateEndpoint(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteEndpointPtr&))
 {
   if (m_command_handlers.find(scheme) != m_command_handlers.end())
   {
@@ -56,7 +55,7 @@ rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtErro
 }
 
 rtError
-rtRemoteFactory::updateFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteEndpointPtr&))
+rtRemoteFactory::updateFunctionCreateEndpoint(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteEndpointPtr&))
 {
   m_command_handlers.insert(AddrCommandHandlerMap::value_type(scheme, f));
   return RT_OK;
@@ -86,7 +85,7 @@ rtRemoteFactory::createResolver(rtRemoteResolverPtr& resolver)
 }
 
 rtError
-rtRemoteFactory::createAddress(std::string const& uri, rtRemoteEndpointPtr& endpoint)
+rtRemoteFactory::createEndpoint(std::string const& uri, rtRemoteEndpointPtr& endpoint)
 {
   std::string scheme = uri.substr(0, uri.find(":"));
   
@@ -100,12 +99,12 @@ rtRemoteFactory::createAddress(std::string const& uri, rtRemoteEndpointPtr& endp
 }
 
 rtError
-rtRemoteFactory::onCreateAddressTcp(std::string const& uri, rtRemoteEndpointPtr& endpoint)
+rtRemoteFactory::onCreateEndpointTcp(std::string const& uri, rtRemoteEndpointPtr& endpoint)
 {
   std::string scheme;
   std::string path;
   std::string host;
-  uint16_t* port;
+  uint16_t* port = nullptr;
 
   rtError e;
   e = rtRemoteParseUri(uri, scheme, path, host, port);
@@ -138,67 +137,80 @@ rtRemoteFactory::onCreateAddressTcp(std::string const& uri, rtRemoteEndpointPtr&
   return RT_OK;
 }
 
-// TODO potentially could modularize since this is virtually identical to tcp
-// Other schemes (file, shmem, etc.) will obviously differ in more meaningful ways
 rtError
-rtRemoteFactory::onCreateAddressUdp(std::string const& uri, rtRemoteEndpointPtr& endpoint)
+rtRemoteFactory::onCreateEndpointUdp(std::string const& uri, rtRemoteEndpointPtr& endpoint)
 {
-  size_t index = uri.find("://");
-  if (index == std::string::npos)
-  {
-   rtLogError("Invalid uri: %s. Expected: <scheme>://<host>[:<port>][<path>]", uri.c_str());
-   return RT_FAIL;
-  }
+  std::string scheme;
+  std::string path;
+  std::string host;
+  uint16_t* port = nullptr;
+
+  rtError e;
+  e = rtRemoteParseUri(uri, scheme, path, host, port);
+  if (e != RT_OK)
+    return e;
   
-  // extract scheme
-  std::string scheme = uri.substr(0, index);
+  RT_ASSERT(!scheme.empty());
+  
   // double check that correct create function is being used
   char const* s = scheme.c_str();
   if (s != nullptr)
   {
     if (strcasecmp(s, "udp") != 0)
     {
-      rtLogError("Cannot create tcp addr from uri: %s", uri.c_str());
+      rtLogError("failed to create endpoint addr from uri: %s.  invalid scheme", uri.c_str());
       return RT_FAIL;
     }
   }
   // make lowercase for consistency
   std::transform(scheme.begin(), scheme.end(), scheme.begin(), ::tolower);
 
-  // We either have a path or host now.  Let's pull the remaining info.
-  index += 3;
-  char ch = uri.at(index);
-  if (ch == '/' || ch == '.')
+  if (!path.empty())
   { // local socket
-    std::string path = uri.substr(index, std::string::npos);
     endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
   }
-  else
-  { // network socket
-    // get port
-    std::string port_string;
-    size_t index_port = uri.find_last_of(":");
-    if (index_port == std::string::npos // no port. no colon found
-      || uri.at(index_port-1) == ':' // no port. colon was part of ipv6 addr
-      || index_port == index-3) // no port.  last colon equals colon in ://
-    {
-      rtLogWarn("No port included included in URI: %s. Defaulting to 0", uri.c_str());
-      port_string = "0";
-      index_port = std::string::npos; // set this for host extraction below
-    }
-    else
-    {
-      port_string = uri.substr(index_port+1, std::string::npos);
-    }
-    int port = stoi(port_string);
-    
-    // get host
-    std::string host;
-    host = uri.substr(index, index_port - index);
-
-    endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, port);   
+  else if (!host.empty() && port != nullptr)
+  {
+    endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, *port);   
   }
   return RT_OK;
 }
+
+rtError
+rtRemoteFactory::onCreateEndpointShmem(std::string const& uri, rtRemoteEndpointPtr& endpoint)
+{
+  std::string scheme;
+  std::string path;
+  std::string host;
+  uint16_t* port = nullptr;
+
+  rtError e;
+  e = rtRemoteParseUri(uri, scheme, path, host, port);
+  if (e != RT_OK)
+    return e;
+  
+  RT_ASSERT(!scheme.empty());
+  RT_ASSERT(!path.empty());
+  RT_ASSERT(host.empty());
+  RT_ASSERT(port == nullptr);
+
+  // double check that correct create function is being used
+  char const* s = scheme.c_str();
+  if (s != nullptr)
+  {
+    if (strcasecmp(s, "shmem") != 0)
+    {
+      rtLogError("failed to shmem endpoint from uri: %s.  invalid scheme", uri.c_str());
+      return RT_FAIL;
+    }
+  }
+  // make lowercase for consistency
+  std::transform(scheme.begin(), scheme.end(), scheme.begin(), ::tolower);
+
+  endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
+
+  return RT_OK;
+}
+
 
 
