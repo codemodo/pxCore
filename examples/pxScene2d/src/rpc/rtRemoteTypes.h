@@ -15,6 +15,7 @@
 
 #define kInvalidSocket (-1)
 #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
+#define CALL_STATIC_FN(ptrToStatic)  (*(ptrToStatic))
 
 class rtRemoteClient;
 class rtRemoteServer;

@@ -44,7 +44,7 @@ rtRemoteFactory::~rtRemoteFactory()
 }
 
 rtError
-rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtError (rtRemoteFactory::* f) (std::string const&, rtRemoteAddrPtr&))
+rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteAddrPtr&))
 {
   if (m_command_handlers.find(scheme) != m_command_handlers.end())
   {
@@ -56,7 +56,7 @@ rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtErro
 }
 
 rtError
-rtRemoteFactory::updateFunctionCreateAddress(std::string const& scheme, rtError (rtRemoteFactory::* f) (std::string const&, rtRemoteAddrPtr&))
+rtRemoteFactory::updateFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteAddrPtr&))
 {
   m_command_handlers.insert(AddrCommandHandlerMap::value_type(scheme, f));
   return RT_OK;
@@ -96,7 +96,8 @@ rtRemoteFactory::createAddress(std::string const& uri, rtRemoteAddrPtr& endpoint
     rtLogError("no command handler registered for: %s", scheme.c_str());
     return RT_FAIL;
   }
-  return CALL_MEMBER_FN(*this, itr->second)(uri, endpoint_addr);
+  return itr->second(uri, endpoint_addr);
+  //return CALL_MEMBER_FN(*this, itr->second)(uri, endpoint_addr);
 }
 
 rtError

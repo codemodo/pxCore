@@ -4,6 +4,8 @@
 #include <rtError.h>
 #include <rtObject.h>
 #include <stdint.h>
+#include <string>
+#include "rtRemoteTypes.h"
 
 #define RT_REMOTE_TIMEOUT_INFINITE UINT32_MAX
 
@@ -50,6 +52,16 @@ rtRemoteRegisterObject(rtRemoteEnvironment* env, char const* id, rtObjectRef con
  */
 rtError
 rtRemoteLocateObject(rtRemoteEnvironment* env, char const* id, rtObjectRef& obj);
+
+/**
+ * Register a static function for creating endpoints of the provided protocol/scheme.
+ * @param scheme The scheme corresponding to the factory function
+ * @param func The factory function
+ * @returns RT_OK for sucess
+ */
+rtError
+rtRemoteRegisterEndpointFactory(rtRemoteEnvironment* env, std::string const& scheme,
+  rtError (*func) (std::string const&, rtRemoteAddrPtr&) );
 
 /**
  * Shutdown rtRemote sub-system

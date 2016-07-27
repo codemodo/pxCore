@@ -39,6 +39,7 @@ rtRemoteEnvironment::rtRemoteEnvironment(rtRemoteConfig* config)
 rtRemoteEnvironment::~rtRemoteEnvironment()
 {
   delete Config;
+  delete Factory;
 }
 
 void
@@ -177,6 +178,12 @@ rtRemoteLocateObject(rtRemoteEnvironment* env, char const* id, rtObjectRef& obj)
     return RT_ERROR_INVALID_ARG;
 
   return env->Server->findObject(id, obj, 3000);
+}
+
+rtError
+rtRemoteRegisterEndpointFactory(rtRemoteEnvironment* env, std::string const& scheme, rtError (*func) (std::string const&, rtRemoteAddrPtr&))
+{
+  return env->Factory->registerFunctionCreateAddress(scheme, func);
 }
 
 rtError

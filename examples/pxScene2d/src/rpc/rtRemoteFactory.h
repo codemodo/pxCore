@@ -15,19 +15,19 @@ public:
   rtRemoteFactory(rtRemoteEnvironment* env);
   ~rtRemoteFactory();
 private:
-  using AddrCommandHandler = rtError (rtRemoteFactory::*)(std::string const&, rtRemoteAddrPtr&);
+  using AddrCommandHandler = rtError (*)(std::string const&, rtRemoteAddrPtr&);
   using AddrCommandHandlerMap = std::map< std::string, AddrCommandHandler >;
 
 public:
   rtError createResolver(rtRemoteResolverPtr& resolver);
   rtError createAddress(std::string const& uri, rtRemoteAddrPtr& addr);
-  rtError onCreateAddressTcp(std::string const& uri, rtRemoteAddrPtr& addr);
-  rtError onCreateAddressUdp(std::string const& uri, rtRemoteAddrPtr& addr);
-  //rtError onCreateAddressHttp(std::string const& uri, rtRemoteAddrPtr& addr);
-  //rtError onCreateAddressFile(std::string const& uri, rtRemoteAddrPtr& addr);
-  //rtError onCreateAddressShmem(std::string const& uri, rtRemoteAddrPtr& addr);
-  rtError registerFunctionCreateAddress(std::string const& scheme, rtError (rtRemoteFactory::* func) (std::string const&, rtRemoteAddrPtr&));
-  rtError updateFunctionCreateAddress(std::string const& scheme, rtError (rtRemoteFactory::* func) (std::string const&, rtRemoteAddrPtr&));
+  static rtError onCreateAddressTcp(std::string const& uri, rtRemoteAddrPtr& addr);
+  static rtError onCreateAddressUdp(std::string const& uri, rtRemoteAddrPtr& addr);
+  //static rtError onCreateAddressHttp(std::string const& uri, rtRemoteAddrPtr& addr);
+  //static rtError onCreateAddressFile(std::string const& uri, rtRemoteAddrPtr& addr);
+  //static rtError onCreateAddressShmem(std::string const& uri, rtRemoteAddrPtr& addr);
+  rtError registerFunctionCreateAddress(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteAddrPtr&));
+  rtError updateFunctionCreateAddress(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteAddrPtr&));
   
   rtRemoteEnvironment* m_env;
   AddrCommandHandlerMap m_command_handlers;
