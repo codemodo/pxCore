@@ -2,8 +2,9 @@
 #define __RT_REMOTE_UTILS_H__
 
 #include "rtRemoteTypes.h"
-#include "rtRemoteEndpoint.h"
-#include "rtSocketUtils.h"
+#include <string>
+#include <sys/socket.h>
+#include <stdint.h>
 
 rtError rtRemoteParseNetType(std::string const& host, NetType& result);
 rtError rtRemoteParseCastType(std::string const& host, NetType const& net_type, CastType& result);

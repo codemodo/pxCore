@@ -1,19 +1,8 @@
 #include "rtRemoteIResolver.h"
-#include <condition_variable>
-#include <map>
-#include <mutex>
-#include <string>
-#include <thread>
-
-#include <stdint.h>
-#include <netinet/in.h>
-#include <rtObject.h>
-#include <rapidjson/document.h>
-
 #include "rtRemoteTypes.h"
-#include "rtRemoteIResolver.h"
-#include "rtSocketUtils.h"
 
+#include <string>
+#include <stdint.h>
 
 class rtRemoteFileResolver : public rtRemoteIResolver
 {

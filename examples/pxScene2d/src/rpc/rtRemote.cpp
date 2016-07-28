@@ -32,8 +32,6 @@ rtRemoteEnvironment::rtRemoteEnvironment(rtRemoteConfig* config)
   ObjectCache = new rtObjectCache(this);
 
   Factory = new rtRemoteFactory(this);
-  rtRemoteRegisterEndpointFactory(this, "tcp", &rtRemoteFactory::onCreateAddressTcp);
-  rtRemoteRegisterEndpointFactory(this, "udp", &rtRemoteFactory::onCreateAddressUdp);
 }
 
 rtRemoteEnvironment::~rtRemoteEnvironment()
@@ -158,7 +156,7 @@ rtRemoteLocateObject(rtRemoteEnvironment* env, char const* id, rtObjectRef& obj)
 rtError
 rtRemoteRegisterEndpointFactory(rtRemoteEnvironment* env, std::string const& scheme, rtError (*func) (std::string const&, rtRemoteEndpointPtr&))
 {
-  return env->Factory->registerFunctionCreateAddress(scheme, func);
+  return env->Factory->registerFunctionCreateEndpoint(scheme, func);
 }
 
 rtError

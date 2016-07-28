@@ -20,14 +20,14 @@ private:
 
 public:
   rtError createResolver(rtRemoteResolverPtr& resolver);
-  rtError createAddress(std::string const& uri, rtRemoteEndpointPtr& addr);
-  static rtError onCreateAddressTcp(std::string const& uri, rtRemoteEndpointPtr& addr);
-  static rtError onCreateAddressUdp(std::string const& uri, rtRemoteEndpointPtr& addr);
-  //static rtError onCreateAddressHttp(std::string const& uri, rtRemoteEndpointPtr& addr);
-  //static rtError onCreateAddressFile(std::string const& uri, rtRemoteEndpointPtr& addr);
-  //static rtError onCreateAddressShmem(std::string const& uri, rtRemoteEndpointPtr& addr);
-  rtError registerFunctionCreateAddress(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteEndpointPtr&));
-  rtError updateFunctionCreateAddress(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteEndpointPtr&));
+  rtError createEndpoint(std::string const& uri, rtRemoteEndpointPtr& addr);
+  static rtError onCreateEndpointTcp(std::string const& uri, rtRemoteEndpointPtr& addr);
+  static rtError onCreateEndpointUdp(std::string const& uri, rtRemoteEndpointPtr& addr);
+  //static rtError onCreateEndpointHttp(std::string const& uri, rtRemoteEndpointPtr& addr);
+  //static rtError onCreateEndpointFile(std::string const& uri, rtRemoteEndpointPtr& addr);
+  static rtError onCreateEndpointShmem(std::string const& uri, rtRemoteEndpointPtr& addr);
+  rtError registerFunctionCreateEndpoint(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteEndpointPtr&));
+  rtError updateFunctionCreateEndpoint(std::string const& scheme, rtError (*func) (std::string const&, rtRemoteEndpointPtr&));
   
   rtRemoteEnvironment* m_env;
   AddrCommandHandlerMap m_command_handlers;

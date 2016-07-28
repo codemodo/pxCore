@@ -1,24 +1,10 @@
 #ifndef __RT_REMOTE_ENDPOINT_H__
 #define __RT_REMOTE_ENDPOINT_H__
 
-#include <string>
 #include "rtRemoteTypes.h"
-#include "rtRemoteUtils.h"
 #include <sys/socket.h>
-#include <condition_variable>
-#include <map>
-#include <mutex>
 #include <string>
-#include <thread>
-
 #include <stdint.h>
-#include <netinet/in.h>
-#include <rtObject.h>
-#include <rapidjson/document.h>
-
-#include "rtRemoteIResolver.h"
-#include "rtSocketUtils.h"
-#include "rtRemoteEndpoint.h"
 
 /* Abstract base class for endpoint addresses */
 class rtRemoteIEndpoint
@@ -89,14 +75,16 @@ protected:
 	int                 m_port;
 };
 
-/* Remote endpoints that include path information*/
+/* Remote endpoints that include path information
+ *
+ * Currently not used.  If use case arises, must be integrated throughout the code.
+ */
 class rtRemoteEndpointDistributed : public rtRemoteEndpointRemote, public rtRemoteEndpointLocal
 {
 public:
 	rtRemoteEndpointDistributed(std::string const& scheme, std::string const& host, int port, std::string const& path);
 	virtual std::string toUri() override;
 };
-
 
 
 /////////////////////////

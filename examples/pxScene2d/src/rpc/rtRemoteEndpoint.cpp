@@ -1,22 +1,18 @@
 #include "rtRemoteEndpoint.h"
+#include "rtRemoteTypes.h"
+#include "rtRemoteUtils.h"
 #include "rtSocketUtils.h"
-#include <sstream>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <sys/types.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <set>
-#include <algorithm>
-#include <sys/stat.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <rtLog.h>
-#include <dirent.h>
+
+#include <sstream>
+#include <string>
+#include <errno.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 // BASE //
 rtRemoteIEndpoint::rtRemoteIEndpoint(std::string const& scheme)
@@ -156,7 +152,7 @@ rtRemoteStreamServerEndpoint::doBind()
   socklen_t len;
   rtSocketGetLength(m_socket, &len);
 
-  ret = bind(m_fd, (struct sockaddr*)(&m_socket), len);
+  ret = bind(m_fd, reinterpret_cast<struct sockaddr*>(&m_socket), len);
   if (ret < 0)
   {
     rtError e = rtErrorFromErrno(errno);

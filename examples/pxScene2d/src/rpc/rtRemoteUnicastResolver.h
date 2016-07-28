@@ -1,4 +1,7 @@
 #include "rtRemoteIResolver.h"
+#include "rtRemoteTypes.h"
+#include "rtSocketUtils.h"
+
 #include <condition_variable>
 #include <map>
 #include <mutex>
@@ -8,10 +11,6 @@
 #include <stdint.h>
 #include <netinet/in.h>
 #include <rtObject.h>
-#include <rapidjson/document.h>
-
-#include "rtRemoteTypes.h"
-#include "rtSocketUtils.h"
 
 class rtRemoteUnicastResolver : public rtRemoteIResolver
 {
@@ -44,7 +43,6 @@ private:
   rtError onLocate(rtJsonDocPtr const& doc, sockaddr_storage const& soc);
 
 private:
-
   sockaddr_storage  m_static_endpoint;
   int               m_static_fd;
   socklen_t         m_static_len;
@@ -60,7 +58,4 @@ private:
 
   sockaddr_storage  m_ns_dest;
   rtRemoteEnvPtr    m_env;
-
-  // endpointMapper;
-  // 
 };

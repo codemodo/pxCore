@@ -454,7 +454,7 @@ rtRemoteServer::openRpcListener()
     return e;
   }
 
-  // populate rtRemoteIEndpoint member object
+  // populate endpoint member
   rtRemoteSocketToEndpointAddress(endpoint_sockaddr, ConnType::STREAM, m_endpoint);
 
   // create server handle

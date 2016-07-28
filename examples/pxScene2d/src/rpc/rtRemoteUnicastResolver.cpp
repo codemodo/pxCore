@@ -2,13 +2,16 @@
 #include "rtSocketUtils.h"
 #include "rtRemoteMessage.h"
 #include "rtRemoteConfig.h"
+#include "rtRemoteTypes.h"
+#include "rtRemoteUtils.h"
+#include "rtRemoteEndpoint.h"
 
+#include <memory>
 #include <condition_variable>
 #include <thread>
 #include <mutex>
 
 #include <rtLog.h>
-
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
@@ -19,7 +22,6 @@
 #include <ifaddrs.h>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
 
 #include <rapidjson/document.h>
@@ -27,8 +29,6 @@
 #include <rapidjson/prettywriter.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
-#include <rapidjson/filereadstream.h>
-#include <rapidjson/filewritestream.h>
 #include <rapidjson/pointer.h>
 
 rtRemoteUnicastResolver::rtRemoteUnicastResolver(rtRemoteEnvPtr env)

@@ -1,16 +1,19 @@
 #include "rtRemoteUtils.h"
 #include "rtRemoteTypes.h"
+#include "rtRemoteEndpoint.h"
+#include "rtSocketUtils.h"
+
 #include <sstream>
 #include <string>
-#include <arpa/inet.h>
+#include <memory>
+
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <sys/types.h>
-#include <netdb.h>
-#include <algorithm>
-#include <memory>
 
 rtError
 rtRemoteParseNetType(std::string const& host, NetType& result)
