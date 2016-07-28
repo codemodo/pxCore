@@ -2,12 +2,6 @@
 #include "rtRemoteTypes.h"
 #include "rtRemoteEndpoint.h"
 #include "rtRemoteUtils.h"
-enum rtResolverType
-{
-  RT_RESOLVER_MULTICAST,
-  RT_RESOLVER_FILE,
-  RT_RESOLVER_UNICAST
-};
 
 class rtRemoteFactory
 {

@@ -299,7 +299,7 @@ rtRemoteServer::runListener()
       sockaddr_storage local_sock;
       memset(&local_sock, 0, sizeof(local_sock));
       rtGetSockName(m_endpoint_server->fd(), local_sock);
-      rtRemoteSocketToEndpointAddress(local_sock, ConnType::STREAM, local_addr);
+      rtRemoteSocketToEndpointAddress(local_sock, rtConnType::STREAM, local_addr);
 
       std::shared_ptr<rtRemoteClient> newClient(new rtRemoteClient(m_env, new_fd, local_addr, remote_addr));
       newClient->setMessageCallback(std::bind(&rtRemoteServer::onIncomingMessage, this, std::placeholders::_1, std::placeholders::_2));
@@ -455,7 +455,7 @@ rtRemoteServer::openRpcListener()
   }
 
   // populate endpoint member
-  rtRemoteSocketToEndpointAddress(endpoint_sockaddr, ConnType::STREAM, m_endpoint);
+  rtRemoteSocketToEndpointAddress(endpoint_sockaddr, rtConnType::STREAM, m_endpoint);
 
   // create server handle
   if (m_endpoint_server)

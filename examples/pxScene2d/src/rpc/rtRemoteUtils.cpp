@@ -16,68 +16,6 @@
 #include <netinet/tcp.h>
 
 rtError
-rtRemoteParseNetType(std::string const& host, NetType& result)
-{
-  int ret;
-  struct addrinfo hint, *res = NULL;
-  memset(&hint, 0, sizeof hint);
-  
-  hint.ai_family = AF_UNSPEC;
-  hint.ai_flags = AI_NUMERICHOST;
-
-  ret = getaddrinfo(host.c_str(), NULL, &hint, &res);
-  if (ret)
-  {
-    result = NetType::UNK;
-    freeaddrinfo(res);
-    rtError e = rtErrorFromErrno(errno);
-    rtLogWarn("unable to determine NetType (network layer protocol) for host: %s", host.c_str());
-    return e;
-  }
-  else
-  {
-    if (res->ai_family == AF_INET)
-      result = NetType::IPV4;
-    else if (res->ai_family == AF_INET6)
-      result = NetType::IPV6;
-    else
-    {
-      result = NetType::UNK;
-      freeaddrinfo(res);
-      rtLogWarn("unable to determine NetType (network layer protocol) for host: %s", host.c_str());
-      return RT_FAIL;
-    }
-  }
-  return RT_OK;
-}
-
-rtError
-rtRemoteParseCastType(std::string const& host, NetType const& net_type, CastType& result)
-{
-  std::string prefix;
-  if (net_type == NetType::IPV4)
-  {
-    prefix = host.substr(0, host.find('.'));
-    if (stoi(prefix) >= 224 && stoi(prefix) <= 239)
-      result = CastType::MULTI;
-    else
-      result = CastType::UNI;
-  }
-  else if (net_type == NetType::IPV6)
-  {
-    prefix = host.substr(0, 2);
-    if (prefix.compare("FF") == 0)
-      result = CastType::MULTI;
-    else
-      result = CastType::UNI;
-  }
-  else
-   result = CastType::UNK;
-
-  return RT_OK;       
-}
-
-rtError
 rtRemoteEndpointAddressToSocket(rtRemoteEndpointPtr addr, sockaddr_storage& ss)
 {
   if (auto local = dynamic_pointer_cast<rtRemoteEndpointLocal>(addr))
@@ -99,18 +37,17 @@ rtRemoteEndpointAddressToSocket(rtRemoteEndpointPtr addr, sockaddr_storage& ss)
   }
 }
 
-//TODO Better error handling here
 rtError
-rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteEndpointPtr& endpoint)
+rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, rtConnType const& conn_type, rtRemoteEndpointPtr& endpoint)
 {
   std::stringstream buff;
   
   std::string scheme;
-  if (conn_type == ConnType::STREAM)
+  if (conn_type == rtConnType::STREAM)
   {
     scheme = "tcp";
   }
-  else if (conn_type == ConnType::DGRAM)
+  else if (conn_type == rtConnType::DGRAM)
   {
     scheme = "udp";
   }
@@ -246,4 +183,63 @@ rtRemoteSameEndpoint(rtRemoteEndpointPtr const& first, rtRemoteEndpointPtr const
     RT_ASSERT(false);
     return false;
   }
+}
+
+rtNetType
+rtRemoteParseNetType(std::string const& host)
+{
+  int ret;
+  struct addrinfo hint, *res = NULL;
+  memset(&hint, 0, sizeof hint);
+  
+  hint.ai_family = AF_UNSPEC;
+  hint.ai_flags = AI_NUMERICHOST;
+
+  ret = getaddrinfo(host.c_str(), NULL, &hint, &res);
+  if (ret)
+  {
+    freeaddrinfo(res);
+    rtLogWarn("unable to determine NetType (network layer protocol) for host: %s", host.c_str());
+    return rtNetType::NONE;
+  }
+  else
+  {
+    if (res->ai_family == AF_INET)
+      return rtNetType::IPV4;
+    else if (res->ai_family == AF_INET6)
+      return rtNetType::IPV6;
+    else
+    {
+      freeaddrinfo(res);
+      rtLogWarn("unable to determine NetType (network layer protocol) for host: %s", host.c_str());
+      return rtNetType::NONE;
+    }
+  }
+}
+
+rtCastType
+rtRemoteParseCastType(std::string const& host)
+{
+  std::string prefix;
+  rtNetType net_type = rtRemoteParseNetType(host);
+  if (net_type == rtNetType::IPV4)
+  {
+    prefix = host.substr(0, host.find('.'));
+    if (stoi(prefix) >= 224 && stoi(prefix) <= 239)
+      return rtCastType::MULTICAST;
+    else
+      return rtCastType::UNICAST;
+  }
+  else if (net_type == rtNetType::IPV6)
+  {
+    prefix = host.substr(0, 2);
+    if (prefix.compare("FF") == 0)
+      return rtCastType::MULTICAST;
+    else
+      return rtCastType::UNICAST;
+  }
+  else
+  {
+    return rtCastType::NONE;
+  }       
 }

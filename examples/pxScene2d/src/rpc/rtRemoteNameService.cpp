@@ -3,10 +3,12 @@
 #include "rtRemoteMessage.h"
 #include "rtRemoteConfig.h"
 #include "rtRemoteTypes.h"
+#include "rtRemoteEndpoint.h"
 
 #include <condition_variable>
 #include <thread>
 #include <mutex>
+#include <memory>
 
 #include <rtLog.h>
 
@@ -181,20 +183,33 @@ rtRemoteNameService::openNsSocket()
 rtError
 rtRemoteNameService::onRegister(rtJsonDocPtr const& doc, sockaddr_storage const& /*soc*/)
 {
-  RT_ASSERT(doc->HasMember(kFieldNameIp));
-  RT_ASSERT(doc->HasMember(kFieldNamePort));
-  
-  sockaddr_storage endpoint_sockaddr;
-  rtError err = rtParseAddress(endpoint_sockaddr, (*doc)[kFieldNameIp].GetString(),
-                (*doc)[kFieldNamePort].GetInt(), nullptr);
-
-  if (err != RT_OK)
-    return err;
+  rtRemoteEndpointPtr objectEndpoint;
+  RT_ASSERT(doc->HasMember(kFieldNameScheme));
+  RT_ASSERT(doc->HasMember(kFieldNameEndpointType));
+  if (std::string((*doc)[kFieldNameEndpointType].GetString()).compare(kEndpointTypeLocal) == 0)
+  {
+    RT_ASSERT(doc->HasMember(kFieldNamePath));
+    std::string scheme, path;
+    scheme = (*doc)[kFieldNameScheme].GetString();
+    path = (*doc)[kFieldNamePath].GetString();
+    objectEndpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
+  }
+  else
+  {
+    RT_ASSERT(doc->HasMember(kFieldNameIp));
+    RT_ASSERT(doc->HasMember(kFieldNamePort));
+    std::string scheme, host;
+    int port;
+    scheme = (*doc)[kFieldNameScheme].GetString();
+    host = (*doc)[kFieldNameIp].GetString();
+    port = (*doc)[kFieldNamePort].GetInt();
+    objectEndpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, port);
+  }
   
   char const* objectId = rtMessage_GetObjectId(*doc);
   
   std::unique_lock<std::mutex> lock(m_mutex);
-  m_registered_objects[objectId] = endpoint_sockaddr;
+  m_registered_objects[objectId] = objectEndpoint;
   lock.unlock();
   return RT_OK;
 }
@@ -229,6 +244,7 @@ rtRemoteNameService::onLookup(rtJsonDocPtr const& doc, sockaddr_storage const& s
   auto itr = m_registered_objects.end();
 
   char const* objectId = rtMessage_GetObjectId(*doc);
+  rtCorrelationKey seqId = rtMessage_GetNextCorrelationKey();
 
   std::unique_lock<std::mutex> lock(m_mutex);
   itr = m_registered_objects.find(objectId);
@@ -237,32 +253,29 @@ rtRemoteNameService::onLookup(rtJsonDocPtr const& doc, sockaddr_storage const& s
   if (itr != m_registered_objects.end())
   { // object is registered
 
-    // get IP and port
-    sockaddr_storage endpoint_sockaddr = itr->second;
-    std::string       ep_addr;
-    uint16_t          ep_port;
-    char buff[128];
-
-    void* addr = nullptr;
-    rtGetInetAddr(endpoint_sockaddr, &addr);
-
-    socklen_t len;
-    rtSocketGetLength(endpoint_sockaddr, &len);
-    char const* p = inet_ntop(endpoint_sockaddr.ss_family, addr, buff, len);
-    if (p)
-      ep_addr = p;
-    rtGetPort(endpoint_sockaddr, &ep_port);
-
     // create and send response
     rapidjson::Document doc;
     doc.SetObject();
     doc.AddMember(kFieldNameMessageType, kNsMessageTypeLookupResponse, doc.GetAllocator());
     doc.AddMember(kFieldNameStatusMessage, kNsStatusSuccess, doc.GetAllocator());
     doc.AddMember(kFieldNameObjectId, std::string(objectId), doc.GetAllocator());
-    doc.AddMember(kFieldNameIp, ep_addr, doc.GetAllocator());
-    doc.AddMember(kFieldNamePort, ep_port, doc.GetAllocator());
-    doc.AddMember(kFieldNameSenderId, senderId->value.GetInt(), doc.GetAllocator());
-    doc.AddMember(kFieldNameCorrelationKey, key, doc.GetAllocator());
+
+    if (auto netAddr = dynamic_pointer_cast<rtRemoteEndpointRemote>(itr->second))
+    {
+      doc.AddMember(kFieldNameEndpointType, kEndpointTypeNet, doc.GetAllocator());
+      doc.AddMember(kFieldNameScheme, netAddr->scheme(), doc.GetAllocator());
+      doc.AddMember(kFieldNameIp, netAddr->host(), doc.GetAllocator());
+      doc.AddMember(kFieldNamePort, netAddr->port(), doc.GetAllocator());
+    }
+    else if (auto localAddr = dynamic_pointer_cast<rtRemoteEndpointLocal>(itr->second))
+    {
+      doc.AddMember(kFieldNameEndpointType, kEndpointTypeLocal, doc.GetAllocator());
+      doc.AddMember(kFieldNameScheme, localAddr->scheme(), doc.GetAllocator());
+      doc.AddMember(kFieldNamePath, localAddr->path(), doc.GetAllocator());
+    }
+
+    doc.AddMember(kFieldNameSenderId, m_pid, doc.GetAllocator());
+    doc.AddMember(kFieldNameCorrelationKey, seqId, doc.GetAllocator());
 
     return rtSendDocument(doc, m_ns_fd, &soc);
   }

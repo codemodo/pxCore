@@ -13,15 +13,15 @@ rtResolverTypeFromString(std::string const& resolverType)
 {
   char const* s = resolverType.c_str();
 
-  rtResolverType t = RT_RESOLVER_MULTICAST;
+  rtResolverType t = rtResolverType::MULTICAST;
   if (s != nullptr)
   {
     if (strcasecmp(s, "multicast") == 0)
-      t = RT_RESOLVER_MULTICAST;
+      t = rtResolverType::MULTICAST;
     else if (strcasecmp(s, "file") == 0)
-      t = RT_RESOLVER_FILE;
+      t = rtResolverType::FILE;
     else if (strcasecmp(s, "unicast") == 0)
-      t = RT_RESOLVER_UNICAST;
+      t = rtResolverType::UNICAST;
     else
       RT_ASSERT(false);
   }
@@ -68,13 +68,13 @@ rtRemoteFactory::createResolver(rtRemoteResolverPtr& resolver)
 
   switch (t)
   {
-    case RT_RESOLVER_MULTICAST:
+    case rtResolverType::MULTICAST:
       resolver = new rtRemoteMulticastResolver(m_env);
       break;
-    case RT_RESOLVER_FILE:
+    case rtResolverType::FILE:
       resolver = new rtRemoteFileResolver(m_env);
       break;
-    case RT_RESOLVER_UNICAST:
+    case rtResolverType::UNICAST:
       resolver = new rtRemoteUnicastResolver(m_env);
       break;
     default:

@@ -94,22 +94,6 @@ rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteEndpoin
     return RT_FAIL;
   }
 
-  sockaddr_storage endpoint_sockaddr;
-  rtRemoteEndpointAddressToSocket(endpoint, endpoint_sockaddr);
-
-  std::string rpc_addr;
-  uint16_t rpc_port;
-  char buff[128];
-  void* addr = nullptr;
-  rtGetInetAddr(endpoint_sockaddr, &addr);
-  
-  socklen_t len;
-  rtSocketGetLength(endpoint_sockaddr, &len);
-  char const* p = inet_ntop(endpoint_sockaddr.ss_family, addr, buff, len);
-  if (p)
-    rpc_addr = p;
-  rtGetPort(endpoint_sockaddr, &rpc_port);
-
   rtError err = RT_OK;
   rtCorrelationKey seqId = rtMessage_GetNextCorrelationKey();
 
@@ -117,8 +101,21 @@ rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteEndpoin
   doc.SetObject();
   doc.AddMember(kFieldNameMessageType, kNsMessageTypeRegister, doc.GetAllocator());
   doc.AddMember(kFieldNameObjectId, name, doc.GetAllocator());
-  doc.AddMember(kFieldNameIp, rpc_addr, doc.GetAllocator());
-  doc.AddMember(kFieldNamePort, rpc_port, doc.GetAllocator());
+
+  if (auto netAddr = dynamic_pointer_cast<rtRemoteEndpointRemote>(endpoint))
+  {
+    doc.AddMember(kFieldNameEndpointType, kEndpointTypeNet, doc.GetAllocator());
+    doc.AddMember(kFieldNameScheme, netAddr->scheme(), doc.GetAllocator());
+    doc.AddMember(kFieldNameIp, netAddr->host(), doc.GetAllocator());
+    doc.AddMember(kFieldNamePort, netAddr->port(), doc.GetAllocator());
+  }
+  else if (auto localAddr = dynamic_pointer_cast<rtRemoteEndpointLocal>(endpoint))
+  {
+    doc.AddMember(kFieldNameEndpointType, kEndpointTypeLocal, doc.GetAllocator());
+    doc.AddMember(kFieldNameScheme, localAddr->scheme(), doc.GetAllocator());
+    doc.AddMember(kFieldNamePath, localAddr->path(), doc.GetAllocator());
+  }
+
   doc.AddMember(kFieldNameSenderId, m_pid, doc.GetAllocator());
   doc.AddMember(kFieldNameCorrelationKey, seqId, doc.GetAllocator());
 
@@ -236,7 +233,7 @@ rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteEndpointP
     {    
       if (strcmp(rtMessage_GetStatusMessage(*searchResponse), kNsStatusFail) == 0)
       {
-        rtLogWarn("ns register failed");
+        rtLogWarn("ns locate failed");
         return RT_FAIL;
       }
       else

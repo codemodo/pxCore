@@ -26,7 +26,7 @@ private:
   using CommandHandler = rtError (rtRemoteNameService::*)(rtJsonDocPtr const&, sockaddr_storage const&);
   using CommandHandlerMap = std::map< std::string, CommandHandler >;
   using RequestMap = std::map< rtCorrelationKey, rtJsonDocPtr >;
-  using RegisteredObjectsMap = std::map< std::string, sockaddr_storage >;
+  using RegisteredObjectsMap = std::map< std::string, rtRemoteEndpointPtr>;
 
   rtError onRegister(rtJsonDocPtr const& doc, sockaddr_storage const& soc);
   rtError onDeregister(rtJsonDocPtr const& doc, sockaddr_storage const& soc);

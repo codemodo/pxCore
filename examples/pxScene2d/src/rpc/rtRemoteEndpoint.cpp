@@ -197,7 +197,7 @@ rtRemoteStreamServerEndpoint::doAccept(int& new_fd, rtRemoteEndpointPtr& remote_
     return RT_FAIL;
   }
   rtLogInfo("new connection from %s with fd:%d", rtSocketToString(remote_endpoint).c_str(), new_fd);
-  return rtRemoteSocketToEndpointAddress(remote_endpoint, ConnType::STREAM, remote_addr);
+  return rtRemoteSocketToEndpointAddress(remote_endpoint, rtConnType::STREAM, remote_addr);
 }
 
 rtError

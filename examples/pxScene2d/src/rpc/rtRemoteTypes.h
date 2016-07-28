@@ -25,9 +25,10 @@ class rtRemoteFactory;
 class rtRemoteIEndpoint;
 class rtRemoteIResolver;
 
-enum class NetType { IPV4, IPV6, ICMP, UNK };
-enum class CastType { UNI, MULTI, BROAD, UNK };
-enum class ConnType { STREAM, DGRAM, UNK };
+enum class rtNetType      { NONE, IPV4, IPV6, ICMP };
+enum class rtCastType     { NONE, UNICAST, MULTICAST, BROADCAST };
+enum class rtConnType     { NONE, STREAM, DGRAM };
+enum class rtResolverType { NONE, MULTICAST, FILE, UNICAST };
 
 struct rtRemoteEnvironment
 {
