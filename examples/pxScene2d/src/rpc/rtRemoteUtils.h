@@ -5,6 +5,7 @@
 #include <string>
 #include <sys/socket.h>
 #include <stdint.h>
+#include <rapidjson/document.h>
 
 rtError rtRemoteEndpointAddressToSocket(rtRemoteEndpointPtr addr, sockaddr_storage& ss);
 rtError rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, rtConnType const& conn_type, rtRemoteEndpointPtr& endpoint);
@@ -15,5 +16,9 @@ bool    rtRemoteSameEndpoint(rtRemoteEndpointPtr const& first, rtRemoteEndpointP
 
 rtNetType  rtRemoteParseNetType(std::string const& host);
 rtCastType rtRemoteParseCastType(std::string const& host);
+
+rtError rtRemoteDocumentToEndpoint(rtJsonDocPtr const& doc, rtRemoteEndpointPtr& endpoint);
+rtError rtRemoteEndpointToDocument(rtRemoteEndpointPtr& endpoint, rapidjson::Document& doc);
+rtError rtRemoteCombineDocuments(rapidjson::Value& target, rapidjson::Value& source, rapidjson::Value::AllocatorType& al);
 
 #endif

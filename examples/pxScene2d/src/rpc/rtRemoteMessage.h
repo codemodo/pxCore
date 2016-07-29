@@ -32,7 +32,7 @@
 #define kFieldNameScheme "scheme"
 #define kFieldNameEndpointType "endpoint.type"
 #define kEndpointTypeLocal "local.endpoint"
-#define kEndpointTypeNet "net.endpoint"
+#define kEndpointTypeRemote "net.endpoint"
 
 #define kMessageTypeInvalidResponse "invalid.response"
 #define kMessageTypeSetByNameRequest "set.byname.request"

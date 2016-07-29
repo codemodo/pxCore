@@ -2,6 +2,7 @@
 #include "rtRemoteTypes.h"
 #include "rtRemoteEndpoint.h"
 #include "rtSocketUtils.h"
+#include "rtRemoteMessage.h"
 
 #include <sstream>
 #include <string>
@@ -242,4 +243,78 @@ rtRemoteParseCastType(std::string const& host)
   {
     return rtCastType::NONE;
   }       
+}
+
+rtError
+rtRemoteEndpointToDocument(rtRemoteEndpointPtr& endpoint, rapidjson::Document& doc)
+{
+  if (auto netAddr = dynamic_pointer_cast<rtRemoteEndpointRemote>(endpoint))
+  {
+    doc.AddMember(kFieldNameEndpointType, kEndpointTypeRemote, doc.GetAllocator());
+    doc.AddMember(kFieldNameScheme, netAddr->scheme(), doc.GetAllocator());
+    doc.AddMember(kFieldNameIp, netAddr->host(), doc.GetAllocator());
+    doc.AddMember(kFieldNamePort, netAddr->port(), doc.GetAllocator());
+    return RT_OK;
+  }
+  else if (auto localAddr = dynamic_pointer_cast<rtRemoteEndpointLocal>(endpoint))
+  {
+    doc.AddMember(kFieldNameEndpointType, kEndpointTypeLocal, doc.GetAllocator());
+    doc.AddMember(kFieldNameScheme, localAddr->scheme(), doc.GetAllocator());
+    doc.AddMember(kFieldNamePath, localAddr->path(), doc.GetAllocator());
+    return RT_OK;
+  }
+  else
+  {
+    //rtLogError("failed to parse endpoint location for object: %s", objectId);
+    return RT_FAIL;
+  }
+  return RT_OK;
+}
+
+rtError
+rtRemoteDocumentToEndpoint(rtJsonDocPtr const& doc, rtRemoteEndpointPtr& endpoint)
+{
+  RT_ASSERT(doc->HasMember(kFieldNameScheme));
+  RT_ASSERT(doc->HasMember(kFieldNameEndpointType));
+  std::string type, scheme;
+  type   = (*doc)[kFieldNameEndpointType].GetString();
+  scheme = (*doc)[kFieldNameScheme].GetString();
+  
+  if (type.compare(kEndpointTypeLocal) == 0)
+  {
+    RT_ASSERT(doc->HasMember(kFieldNamePath));
+    std::string path;
+    path = (*doc)[kFieldNamePath].GetString();
+    // create and return local endpoint address
+    endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
+    return RT_OK;
+  }
+  else if (type.compare(kEndpointTypeRemote) == 0)
+  {
+    RT_ASSERT(doc->HasMember(kFieldNameIp));
+    RT_ASSERT(doc->HasMember(kFieldNamePort));
+    std::string host;
+    uint16_t port;
+    host = (*doc)[kFieldNameIp].GetString();
+    port = (*doc)[kFieldNamePort].GetInt();
+    // create and return net endpoint address
+    endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, port);
+    return RT_OK;
+  }
+  else
+  {
+    rtLogError("unknown endpoint type: %s", type.c_str());
+    return RT_ERROR;
+  }
+  return RT_OK;  
+}
+
+rtError
+rtRemoteCombineDocuments(rapidjson::Value& target, rapidjson::Value& source, rapidjson::Value::AllocatorType& al)
+{
+  RT_ASSERT(target.IsObject());
+  RT_ASSERT(source.IsObject());
+  for (rapidjson::Value::MemberIterator itr = source.MemberBegin(); itr != source.MemberEnd(); ++itr)
+        target.AddMember(itr->name, itr->value, al);
+  return RT_OK;
 }

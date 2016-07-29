@@ -111,7 +111,7 @@ rtRemoteFileResolver::locateObject(std::string const& name, rtRemoteEndpointPtr&
   rapidjson::Value* scheme = rapidjson::Pointer("/" + name + "/" + kFieldNameScheme).Get(doc);
   rapidjson::Value* epType = rapidjson::Pointer("/" + name + "/" + kFieldNameEndpointType).Get(doc);
   RT_ASSERT(epType != nullptr);
-  if (strcmp(epType->GetString(), kEndpointTypeNet) == 0)
+  if (strcmp(epType->GetString(), kEndpointTypeRemote) == 0)
   {
     rapidjson::Value *ip = rapidjson::Pointer("/" + name + "/" + kFieldNameIp).Get(doc);
     rapidjson::Value *port = rapidjson::Pointer("/" + name + "/" + kFieldNamePort).Get(doc);

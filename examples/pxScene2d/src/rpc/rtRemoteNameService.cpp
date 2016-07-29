@@ -4,6 +4,7 @@
 #include "rtRemoteConfig.h"
 #include "rtRemoteTypes.h"
 #include "rtRemoteEndpoint.h"
+#include "rtRemoteUtils.h"
 
 #include <condition_variable>
 #include <thread>
@@ -184,28 +185,8 @@ rtError
 rtRemoteNameService::onRegister(rtJsonDocPtr const& doc, sockaddr_storage const& /*soc*/)
 {
   rtRemoteEndpointPtr objectEndpoint;
-  RT_ASSERT(doc->HasMember(kFieldNameScheme));
-  RT_ASSERT(doc->HasMember(kFieldNameEndpointType));
-  if (std::string((*doc)[kFieldNameEndpointType].GetString()).compare(kEndpointTypeLocal) == 0)
-  {
-    RT_ASSERT(doc->HasMember(kFieldNamePath));
-    std::string scheme, path;
-    scheme = (*doc)[kFieldNameScheme].GetString();
-    path = (*doc)[kFieldNamePath].GetString();
-    objectEndpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
-  }
-  else
-  {
-    RT_ASSERT(doc->HasMember(kFieldNameIp));
-    RT_ASSERT(doc->HasMember(kFieldNamePort));
-    std::string scheme, host;
-    int port;
-    scheme = (*doc)[kFieldNameScheme].GetString();
-    host = (*doc)[kFieldNameIp].GetString();
-    port = (*doc)[kFieldNamePort].GetInt();
-    objectEndpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, port);
-  }
-  
+
+  rtRemoteDocumentToEndpoint(doc, objectEndpoint);
   char const* objectId = rtMessage_GetObjectId(*doc);
   
   std::unique_lock<std::mutex> lock(m_mutex);
@@ -262,7 +243,7 @@ rtRemoteNameService::onLookup(rtJsonDocPtr const& doc, sockaddr_storage const& s
 
     if (auto netAddr = dynamic_pointer_cast<rtRemoteEndpointRemote>(itr->second))
     {
-      doc.AddMember(kFieldNameEndpointType, kEndpointTypeNet, doc.GetAllocator());
+      doc.AddMember(kFieldNameEndpointType, kEndpointTypeRemote, doc.GetAllocator());
       doc.AddMember(kFieldNameScheme, netAddr->scheme(), doc.GetAllocator());
       doc.AddMember(kFieldNameIp, netAddr->host(), doc.GetAllocator());
       doc.AddMember(kFieldNamePort, netAddr->port(), doc.GetAllocator());

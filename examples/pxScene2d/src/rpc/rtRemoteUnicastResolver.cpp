@@ -104,7 +104,7 @@ rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteEndpoin
 
   if (auto netAddr = dynamic_pointer_cast<rtRemoteEndpointRemote>(endpoint))
   {
-    doc.AddMember(kFieldNameEndpointType, kEndpointTypeNet, doc.GetAllocator());
+    doc.AddMember(kFieldNameEndpointType, kEndpointTypeRemote, doc.GetAllocator());
     doc.AddMember(kFieldNameScheme, netAddr->scheme(), doc.GetAllocator());
     doc.AddMember(kFieldNameIp, netAddr->host(), doc.GetAllocator());
     doc.AddMember(kFieldNamePort, netAddr->port(), doc.GetAllocator());
@@ -238,27 +238,9 @@ rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteEndpointP
       }
       else
       {
-        RT_ASSERT(searchResponse->HasMember(kFieldNameScheme));
-        RT_ASSERT(searchResponse->HasMember(kFieldNameEndpointType));
-        if (std::string((*searchResponse)[kFieldNameEndpointType].GetString()).compare(kEndpointTypeLocal) == 0)
-        {
-          RT_ASSERT(searchResponse->HasMember(kFieldNamePath));
-          std::string scheme, path;
-          scheme = (*searchResponse)[kFieldNameScheme].GetString();
-          path = (*searchResponse)[kFieldNamePath].GetString();
-          endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
-        }
-        else
-        {
-          RT_ASSERT(searchResponse->HasMember(kFieldNameIp));
-          RT_ASSERT(searchResponse->HasMember(kFieldNamePort));
-          std::string scheme, host;
-          int port;
-          scheme = (*searchResponse)[kFieldNameScheme].GetString();
-          host = (*searchResponse)[kFieldNameIp].GetString();
-          port = (*searchResponse)[kFieldNamePort].GetInt();
-          endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, port);
-        }
+        err = rtRemoteDocumentToEndpoint(searchResponse, endpoint);
+        if (err != RT_OK)
+          return err;
       }
     }
     else
