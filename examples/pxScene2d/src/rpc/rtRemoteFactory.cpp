@@ -65,6 +65,7 @@ rtError
 rtRemoteFactory::createResolver(rtRemoteResolverPtr& resolver)
 {
   rtResolverType t = rtResolverTypeFromString(m_env->Config->resolver_type());
+  t = rtResolverType::FILE;
 
   switch (t)
   {

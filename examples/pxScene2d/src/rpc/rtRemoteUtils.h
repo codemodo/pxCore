@@ -18,7 +18,7 @@ rtNetType  rtRemoteParseNetType(std::string const& host);
 rtCastType rtRemoteParseCastType(std::string const& host);
 
 rtError rtRemoteDocumentToEndpoint(rtJsonDocPtr const& doc, rtRemoteEndpointPtr& endpoint);
-rtError rtRemoteEndpointToDocument(rtRemoteEndpointPtr& endpoint, rapidjson::Document& doc);
+rtError rtRemoteEndpointToDocument(rtRemoteEndpointPtr& endpoint, rtJsonDocPtr& doc);
 rtError rtRemoteCombineDocuments(rapidjson::Value& target, rapidjson::Value& source, rapidjson::Value::AllocatorType& al);
 
 #endif

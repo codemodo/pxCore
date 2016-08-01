@@ -50,7 +50,7 @@ rtRemoteFileResolver::open()
 }
 
 rtError
-rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteEndpointPtr /*endpoint*/)
+rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteEndpointPtr endpoint)
 {
   if (m_db_fp == nullptr)
   {
@@ -58,28 +58,34 @@ rtRemoteFileResolver::registerObject(std::string const& name, rtRemoteEndpointPt
     return RT_ERROR_INVALID_ARG;
   }
 
-  // TODO: don't put such large buffers on stack
+  std::string path, tmp_path;
+  path = m_env->Config->resolver_file_db_path();
+  tmp_path = path + ".tmp";
 
-  // read in existing records into DOM
-  rapidjson::Document doc;
-  char readBuffer[65536];
   fseek(m_db_fp, 0, SEEK_SET);
   flock(fileno(m_db_fp), LOCK_EX);
-  rapidjson::FileReadStream is(m_db_fp, readBuffer, sizeof(readBuffer));
-  doc.ParseStream(is);
-
-  //TODO
-  rapidjson::Pointer("/" + name + "/" + kFieldNameIp).Set(doc, "");
-  rapidjson::Pointer("/" + name + "/" + kFieldNamePort).Set(doc, 11);
-
-  // write updated json back to file
-  char writeBuffer[65536];
-  fseek(m_db_fp, 0, SEEK_SET);  
-  rapidjson::FileWriteStream os(m_db_fp, writeBuffer, sizeof(writeBuffer));
-  rapidjson::Writer<rapidjson::FileWriteStream> writer(os);
-  doc.Accept(writer);
+  FILE *tmp_fp = fopen(tmp_path.c_str(),"w");
+  char *line = NULL;
+  size_t len = 0;
+  while (getline(&line, &len, m_db_fp) != -1)
+  {
+    std::string line_string(line);
+    size_t index = line_string.find("::=");
+    if (index != std::string::npos)
+    {
+      std::string objId = line_string.substr(0, index);
+      if (name.compare(objId) != 0)
+        fprintf(tmp_fp, "%s\n", line);
+    }
+  }
+  std::string result = name + "::=" + endpoint->toUri();
+  fprintf(tmp_fp, "%s", result.c_str());
+  fclose(tmp_fp);
   flock(fileno(m_db_fp), LOCK_UN);
   fflush(m_db_fp);
+  
+  if (!rename(tmp_path.c_str(), path.c_str()))
+    return RT_FAIL;
 
   return RT_OK;
 }

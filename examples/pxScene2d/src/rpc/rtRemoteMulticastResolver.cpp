@@ -314,10 +314,10 @@ rtRemoteMulticastResolver::onSearch(rtJsonDocPtr const& doc, sockaddr_storage co
     doc.AddMember(kFieldNameSenderId, senderId->value.GetInt(), doc.GetAllocator());
     doc.AddMember(kFieldNameCorrelationKey, key, doc.GetAllocator());
 
-    rapidjson::Document doc_ep;
-    doc_ep.SetObject();
+    rtJsonDocPtr doc_ep(new rapidjson::Document());
+    doc_ep->SetObject();
     rtRemoteEndpointToDocument(itr->second, doc_ep);
-    rtRemoteCombineDocuments(doc, doc_ep, doc.GetAllocator());
+    rtRemoteCombineDocuments(doc, *doc_ep, doc.GetAllocator());
 
     return rtSendDocument(doc, m_ucast_fd, &soc);
   }

@@ -246,26 +246,25 @@ rtRemoteParseCastType(std::string const& host)
 }
 
 rtError
-rtRemoteEndpointToDocument(rtRemoteEndpointPtr& endpoint, rapidjson::Document& doc)
+rtRemoteEndpointToDocument(rtRemoteEndpointPtr& endpoint, rtJsonDocPtr& doc)
 {
-  if (auto netAddr = dynamic_pointer_cast<rtRemoteEndpointRemote>(endpoint))
+  if (auto remote_endpoint = dynamic_pointer_cast<rtRemoteEndpointRemote>(endpoint))
   {
-    doc.AddMember(kFieldNameEndpointType, kEndpointTypeRemote, doc.GetAllocator());
-    doc.AddMember(kFieldNameScheme, netAddr->scheme(), doc.GetAllocator());
-    doc.AddMember(kFieldNameIp, netAddr->host(), doc.GetAllocator());
-    doc.AddMember(kFieldNamePort, netAddr->port(), doc.GetAllocator());
+    doc->AddMember(kFieldNameEndpointType, kEndpointTypeRemote, doc->GetAllocator());
+    doc->AddMember(kFieldNameScheme, remote_endpoint->scheme(), doc->GetAllocator());
+    doc->AddMember(kFieldNameIp, remote_endpoint->host(), doc->GetAllocator());
+    doc->AddMember(kFieldNamePort, remote_endpoint->port(), doc->GetAllocator());
     return RT_OK;
   }
-  else if (auto localAddr = dynamic_pointer_cast<rtRemoteEndpointLocal>(endpoint))
+  else if (auto local_endpoint = dynamic_pointer_cast<rtRemoteEndpointLocal>(endpoint))
   {
-    doc.AddMember(kFieldNameEndpointType, kEndpointTypeLocal, doc.GetAllocator());
-    doc.AddMember(kFieldNameScheme, localAddr->scheme(), doc.GetAllocator());
-    doc.AddMember(kFieldNamePath, localAddr->path(), doc.GetAllocator());
+    doc->AddMember(kFieldNameEndpointType, kEndpointTypeLocal, doc->GetAllocator());
+    doc->AddMember(kFieldNameScheme, local_endpoint->scheme(), doc->GetAllocator());
+    doc->AddMember(kFieldNamePath, local_endpoint->path(), doc->GetAllocator());
     return RT_OK;
   }
   else
   {
-    //rtLogError("failed to parse endpoint location for object: %s", objectId);
     return RT_FAIL;
   }
   return RT_OK;
