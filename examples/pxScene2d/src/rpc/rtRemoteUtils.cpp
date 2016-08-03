@@ -309,11 +309,11 @@ rtRemoteDocumentToEndpoint(rtJsonDocPtr const& doc, rtRemoteEndpointPtr& endpoin
 }
 
 rtError
-rtRemoteCombineDocuments(rapidjson::Value& target, rapidjson::Value& source, rapidjson::Value::AllocatorType& al)
+rtRemoteCombineDocuments(rtJsonDocPtr& target, rtJsonDocPtr& source)
 {
-  RT_ASSERT(target.IsObject());
-  RT_ASSERT(source.IsObject());
-  for (rapidjson::Value::MemberIterator itr = source.MemberBegin(); itr != source.MemberEnd(); ++itr)
-        target.AddMember(itr->name, itr->value, al);
+  RT_ASSERT(target->IsObject());
+  RT_ASSERT(source->IsObject());
+  for (rapidjson::Value::MemberIterator itr = source->MemberBegin(); itr != source->MemberEnd(); ++itr)
+        target->AddMember(itr->name, itr->value, target->GetAllocator());
   return RT_OK;
 }

@@ -44,7 +44,7 @@ private:
 
 private:
   sockaddr_storage  m_static_endpoint;
-  int               m_static_fd;
+  int               m_fd;
   socklen_t         m_static_len;
 
   std::unique_ptr<std::thread> m_read_thread;
@@ -53,8 +53,8 @@ private:
   pid_t             m_pid;
   CommandHandlerMap m_command_handlers;
   HostedObjectsMap  m_hosted_objects;
-  RequestMap	    m_pending_searches;
-  int		        m_shutdown_pipe[2];
+  RequestMap	      m_pending_searches;
+  int		            m_shutdown_pipe[2];
 
   sockaddr_storage  m_ns_dest;
   rtRemoteEnvPtr    m_env;

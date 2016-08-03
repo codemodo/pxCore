@@ -41,6 +41,7 @@ rtRemoteNameService::rtRemoteNameService(rtRemoteEnvPtr env)
   , m_pid(getpid())
   , m_command_handlers()
   , m_env(env)
+  , m_file_resolver(nullptr)
 {
   memset(&m_ns_endpoint, 0, sizeof(m_ns_endpoint));
 
@@ -72,7 +73,7 @@ rtRemoteNameService::init()
 {
   rtError err = RT_OK;
 
-  // TODO eventually, use a db rather than map.  Open it here.
+  m_file_resolver = new rtRemoteFileResolver(m_env);
 
   // get socket info ready
   uint16_t const nsport = m_env->Config->resolver_unicast_port();
@@ -100,6 +101,11 @@ rtRemoteNameService::init()
 rtError
 rtRemoteNameService::close()
 {
+  if (m_file_resolver)
+  {
+    m_file_resolver->close();
+    delete m_file_resolver;
+  }
   if (m_shutdown_pipe[1] != -1)
   {
     char buff[] = {"shutdown"};
@@ -192,6 +198,11 @@ rtRemoteNameService::onRegister(rtJsonDocPtr const& doc, sockaddr_storage const&
   std::unique_lock<std::mutex> lock(m_mutex);
   m_registered_objects[objectId] = objectEndpoint;
   lock.unlock();
+
+  m_file_resolver->open();
+  m_file_resolver->registerObject(objectId, objectEndpoint);
+  m_file_resolver->close();
+
   return RT_OK;
 }
 
@@ -231,34 +242,31 @@ rtRemoteNameService::onLookup(rtJsonDocPtr const& doc, sockaddr_storage const& s
   itr = m_registered_objects.find(objectId);
   lock.unlock();
 
-  if (itr != m_registered_objects.end())
+  rtRemoteEndpointPtr objectEndpoint;
+  m_file_resolver->open();
+  m_file_resolver->locateObject(objectId, objectEndpoint, 0);
+  m_file_resolver->close();
+
+  if (objectEndpoint)
   { // object is registered
 
     // create and send response
-    rapidjson::Document doc;
-    doc.SetObject();
-    doc.AddMember(kFieldNameMessageType, kNsMessageTypeLookupResponse, doc.GetAllocator());
-    doc.AddMember(kFieldNameStatusMessage, kNsStatusSuccess, doc.GetAllocator());
-    doc.AddMember(kFieldNameObjectId, std::string(objectId), doc.GetAllocator());
+    rtJsonDocPtr doc(new rapidjson::Document());
+    doc->SetObject();
+    doc->AddMember(kFieldNameMessageType, kNsMessageTypeLookupResponse, doc->GetAllocator());
+    doc->AddMember(kFieldNameStatusMessage, kNsStatusSuccess, doc->GetAllocator());
+    doc->AddMember(kFieldNameObjectId, std::string(objectId), doc->GetAllocator());
+    doc->AddMember(kFieldNameSenderId, m_pid, doc->GetAllocator());
+    doc->AddMember(kFieldNameCorrelationKey, seqId, doc->GetAllocator());
+    
+    rtJsonDocPtr endpoint_doc(new rapidjson::Document());
+    endpoint_doc->SetObject();
+    rtRemoteEndpointToDocument(objectEndpoint, endpoint_doc);
+    rtRemoteCombineDocuments(doc, endpoint_doc);
 
-    if (auto netAddr = dynamic_pointer_cast<rtRemoteEndpointRemote>(itr->second))
-    {
-      doc.AddMember(kFieldNameEndpointType, kEndpointTypeRemote, doc.GetAllocator());
-      doc.AddMember(kFieldNameScheme, netAddr->scheme(), doc.GetAllocator());
-      doc.AddMember(kFieldNameIp, netAddr->host(), doc.GetAllocator());
-      doc.AddMember(kFieldNamePort, netAddr->port(), doc.GetAllocator());
-    }
-    else if (auto localAddr = dynamic_pointer_cast<rtRemoteEndpointLocal>(itr->second))
-    {
-      doc.AddMember(kFieldNameEndpointType, kEndpointTypeLocal, doc.GetAllocator());
-      doc.AddMember(kFieldNameScheme, localAddr->scheme(), doc.GetAllocator());
-      doc.AddMember(kFieldNamePath, localAddr->path(), doc.GetAllocator());
-    }
+    rtLogInfo("\n\nNAMESERVICE: reporting location as %s\n\n", objectEndpoint->toUriString().c_str());
 
-    doc.AddMember(kFieldNameSenderId, m_pid, doc.GetAllocator());
-    doc.AddMember(kFieldNameCorrelationKey, seqId, doc.GetAllocator());
-
-    return rtSendDocument(doc, m_ns_fd, &soc);
+    return rtSendDocument(*doc, m_ns_fd, &soc);
   }
   return RT_OK;
 }

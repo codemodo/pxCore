@@ -346,11 +346,7 @@ rtSendDocument(rapidjson::Document const& doc, int fd, sockaddr_storage const* d
   #endif
  
   if (dest)
-  {
-    // TODO Fiuk delete
-    // rtLogWarn("\n\n\nsending to. dest:%s family:%d", rtSocketToString(*dest).c_str(),
-    //     dest->ss_family);
-    
+  { 
     socklen_t len;
     rtSocketGetLength(*dest, &len);
 
@@ -370,10 +366,6 @@ rtSendDocument(rapidjson::Document const& doc, int fd, sockaddr_storage const* d
   }
   else
   {
-    // TODO Fiuk delete
-    // rtGetPeerName(fd, remote_endpoint);
-    // rtLogWarn("\n\n\nsending to. dest:%s family:%d", rtSocketToString(remote_endpoint).c_str(),
-    //     remote_endpoint.ss_family);
 
     // send length first
     int n = buff.GetSize();

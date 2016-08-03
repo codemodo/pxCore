@@ -13,7 +13,7 @@ public:
 	rtRemoteIEndpoint(std::string const& scheme);
 	virtual ~rtRemoteIEndpoint();
 
-	virtual std::string toUri() = 0;
+	virtual std::string toUriString() = 0;
 
 	inline std::string scheme() const
 	  { return m_scheme; }
@@ -31,7 +31,7 @@ class rtRemoteEndpointLocal : public virtual rtRemoteIEndpoint
 public:
 	rtRemoteEndpointLocal(std::string const& scheme, std::string const& path);
 	
-	virtual std::string toUri() override;
+	virtual std::string toUriString() override;
 
 	bool isSocket() const;
 
@@ -56,7 +56,7 @@ class rtRemoteEndpointRemote : public virtual rtRemoteIEndpoint
 public:
   rtRemoteEndpointRemote(std::string const& scheme, std::string const& host, int port);
 	
-	virtual std::string toUri() override;
+	virtual std::string toUriString() override;
 
 	inline std::string host() const
 	  { return m_host; }
@@ -83,7 +83,7 @@ class rtRemoteEndpointDistributed : public rtRemoteEndpointRemote, public rtRemo
 {
 public:
 	rtRemoteEndpointDistributed(std::string const& scheme, std::string const& host, int port, std::string const& path);
-	virtual std::string toUri() override;
+	virtual std::string toUriString() override;
 };
 
 

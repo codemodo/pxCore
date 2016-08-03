@@ -249,6 +249,7 @@ rtRemoteStream::connectTo(rtRemoteEndpointPtr const& addr)
   memset(&endpoint_sockaddr, 0, sizeof(endpoint_sockaddr));
   rtRemoteEndpointAddressToSocket(addr, endpoint_sockaddr);
   m_fd = socket(endpoint_sockaddr.ss_family, SOCK_STREAM, 0);
+  rtLogInfo("\n\ntrying to connect to %s\n\n", addr->toUriString().c_str());
   if (m_fd < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -280,14 +281,14 @@ rtRemoteStream::connectTo(rtRemoteEndpointPtr const& addr)
   {
     rtLogInfo("new connection (%d) %s --> %s",
       m_fd,
-      m_local_endpoint->toUri().c_str(),
-      m_remote_endpoint->toUri().c_str());
+      m_local_endpoint->toUriString().c_str(),
+      m_remote_endpoint->toUriString().c_str());
   }
   else
   {
     rtLogInfo("new connection (%d) --> %s",
       m_fd,
-      m_remote_endpoint->toUri().c_str());   
+      m_remote_endpoint->toUriString().c_str());   
   }
 
   return RT_OK;

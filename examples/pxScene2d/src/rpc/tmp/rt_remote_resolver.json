@@ -1,4 +1,1 @@
-com.xfinity.xsmart.Thermostat.AlexsHouse::=tcp:///tmp/rt_remote_soc.5108
-
-com.xfinity.xsmart.Thermostat.JohnsHouse::=tcp:///tmp/rt_remote_soc.5168
-com.xfinity.xsmart.Thermostat.JakesHouse::=tcp:///tmp/rt_remote_soc.5241
+com.xfinity.xsmart.Thermostat.JakesHouse::=tcp:///tmp/rt_remote_soc.6903

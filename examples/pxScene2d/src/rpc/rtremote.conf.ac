@@ -65,7 +65,7 @@
     "type":"string" },
 
 { "name":"rt.rpc.resolver.unicast.address",
-    "default_value":"127.0.0.1",
+    "default_value":"10.21.33.37",
     "type":"string" },
 
 { "name":"rt.rpc.resolver.unicast.port",

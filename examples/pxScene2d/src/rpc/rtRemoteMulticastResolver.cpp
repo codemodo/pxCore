@@ -307,19 +307,19 @@ rtRemoteMulticastResolver::onSearch(rtJsonDocPtr const& doc, sockaddr_storage co
 
   if (itr != m_hosted_objects.end())
   {
-    rapidjson::Document doc;
-    doc.SetObject();
-    doc.AddMember(kFieldNameMessageType, kMessageTypeLocate, doc.GetAllocator());
-    doc.AddMember(kFieldNameObjectId, std::string(objectId), doc.GetAllocator());
-    doc.AddMember(kFieldNameSenderId, senderId->value.GetInt(), doc.GetAllocator());
-    doc.AddMember(kFieldNameCorrelationKey, key, doc.GetAllocator());
+    rtJsonDocPtr doc(new rapidjson::Document());
+    doc->SetObject();
+    doc->AddMember(kFieldNameMessageType, kMessageTypeLocate, doc->GetAllocator());
+    doc->AddMember(kFieldNameObjectId, std::string(objectId), doc->GetAllocator());
+    doc->AddMember(kFieldNameSenderId, senderId->value.GetInt(), doc->GetAllocator());
+    doc->AddMember(kFieldNameCorrelationKey, key, doc->GetAllocator());
 
-    rtJsonDocPtr doc_ep(new rapidjson::Document());
-    doc_ep->SetObject();
-    rtRemoteEndpointToDocument(itr->second, doc_ep);
-    rtRemoteCombineDocuments(doc, *doc_ep, doc.GetAllocator());
+    rtJsonDocPtr endpoint_doc(new rapidjson::Document());
+    endpoint_doc->SetObject();
+    rtRemoteEndpointToDocument(itr->second, endpoint_doc);
+    rtRemoteCombineDocuments(doc, endpoint_doc);
 
-    return rtSendDocument(doc, m_ucast_fd, &soc);
+    return rtSendDocument(*doc, m_ucast_fd, &soc);
   }
   
   return RT_OK;

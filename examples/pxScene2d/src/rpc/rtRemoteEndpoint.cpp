@@ -34,7 +34,7 @@ rtRemoteEndpointLocal::isSocket() const
 }
 
 std::string
-rtRemoteEndpointLocal::toUri()
+rtRemoteEndpointLocal::toUriString()
 {
   std::stringstream buff;
   buff << m_scheme;
@@ -52,7 +52,7 @@ rtRemoteEndpointRemote::rtRemoteEndpointRemote(std::string const& scheme, std::s
 { }
 
 std::string
-rtRemoteEndpointRemote::toUri()
+rtRemoteEndpointRemote::toUriString()
 {
   std::stringstream buff;
   buff << m_scheme;
@@ -71,7 +71,7 @@ rtRemoteEndpointDistributed::rtRemoteEndpointDistributed(std::string const& sche
 { }
 
 std::string
-rtRemoteEndpointDistributed::toUri()
+rtRemoteEndpointDistributed::toUriString()
 {
   std::stringstream buff;
   buff << m_scheme;

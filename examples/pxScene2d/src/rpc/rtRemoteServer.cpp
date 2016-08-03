@@ -380,14 +380,15 @@ rtRemoteServer::findObject(std::string const& name, rtObjectRef& obj, uint32_t t
   {
     std::shared_ptr<rtRemoteIEndpoint> object_endpoint;
     err = m_resolver->locateObject(name, object_endpoint, timeout);
+    rtLogInfo("\n\nSERVER: received location as %s\n\n", object_endpoint->toUriString().c_str());
 
     rtLogDebug("object %s found at endpoint: %s", name.c_str(),
-      object_endpoint->toUri().c_str());
+      object_endpoint->toUriString().c_str());
 
     if (err == RT_OK)
     {
       std::shared_ptr<rtRemoteClient> client;
-      std::string const endpointName = object_endpoint->toUri();
+      std::string const endpointName = object_endpoint->toUriString();
 
       std::unique_lock<std::mutex> lock(m_mutex);
       auto itr = m_object_map.find(endpointName);

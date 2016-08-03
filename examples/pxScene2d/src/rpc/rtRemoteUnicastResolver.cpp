@@ -32,7 +32,7 @@
 #include <rapidjson/pointer.h>
 
 rtRemoteUnicastResolver::rtRemoteUnicastResolver(rtRemoteEnvPtr env)
-  : m_static_fd(-1)
+  : m_fd(-1)
   , m_pid(getpid())
   , m_command_handlers()
   , m_env(env)
@@ -88,7 +88,7 @@ rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteEndpoin
 rtError
 rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteEndpointPtr endpoint, uint32_t timeout)
 {
-  if (m_static_fd == -1)
+  if (m_fd == -1)
   {
     rtLogError("unicast socket not opened");
     return RT_FAIL;
@@ -97,29 +97,20 @@ rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteEndpoin
   rtError err = RT_OK;
   rtCorrelationKey seqId = rtMessage_GetNextCorrelationKey();
 
-  rapidjson::Document doc;
-  doc.SetObject();
-  doc.AddMember(kFieldNameMessageType, kNsMessageTypeRegister, doc.GetAllocator());
-  doc.AddMember(kFieldNameObjectId, name, doc.GetAllocator());
+  rtJsonDocPtr doc(new rapidjson::Document());
+  doc->SetObject();
+  doc->AddMember(kFieldNameMessageType, kNsMessageTypeRegister, doc->GetAllocator());
+  doc->AddMember(kFieldNameObjectId, name, doc->GetAllocator());
+  doc->AddMember(kFieldNameSenderId, m_pid, doc->GetAllocator());
+  doc->AddMember(kFieldNameCorrelationKey, seqId, doc->GetAllocator());
 
-  if (auto netAddr = dynamic_pointer_cast<rtRemoteEndpointRemote>(endpoint))
-  {
-    doc.AddMember(kFieldNameEndpointType, kEndpointTypeRemote, doc.GetAllocator());
-    doc.AddMember(kFieldNameScheme, netAddr->scheme(), doc.GetAllocator());
-    doc.AddMember(kFieldNameIp, netAddr->host(), doc.GetAllocator());
-    doc.AddMember(kFieldNamePort, netAddr->port(), doc.GetAllocator());
-  }
-  else if (auto localAddr = dynamic_pointer_cast<rtRemoteEndpointLocal>(endpoint))
-  {
-    doc.AddMember(kFieldNameEndpointType, kEndpointTypeLocal, doc.GetAllocator());
-    doc.AddMember(kFieldNameScheme, localAddr->scheme(), doc.GetAllocator());
-    doc.AddMember(kFieldNamePath, localAddr->path(), doc.GetAllocator());
-  }
+  // add endpoint info to doc
+  rtJsonDocPtr endpoint_doc(new rapidjson::Document());
+  endpoint_doc->SetObject();
+  rtRemoteEndpointToDocument(endpoint, endpoint_doc);
+  rtRemoteCombineDocuments(doc, endpoint_doc);
 
-  doc.AddMember(kFieldNameSenderId, m_pid, doc.GetAllocator());
-  doc.AddMember(kFieldNameCorrelationKey, seqId, doc.GetAllocator());
-
-  err = rtSendDocument(doc, m_static_fd, &m_ns_dest);
+  err = rtSendDocument(*doc, m_fd, &m_ns_dest);
   if (err != RT_OK)
     return err;
 
@@ -177,7 +168,7 @@ rtError
 rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteEndpointPtr& endpoint,
     uint32_t timeout)
 {
-  if (m_static_fd == -1)
+  if (m_fd == -1)
   {
     rtLogError("unicast socket not opened");
     return RT_FAIL;
@@ -193,7 +184,7 @@ rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteEndpointP
   doc.AddMember(kFieldNameSenderId, m_pid, doc.GetAllocator());
   doc.AddMember(kFieldNameCorrelationKey, seqId, doc.GetAllocator());
 
-  err = rtSendDocument(doc, m_static_fd, &m_ns_dest);
+  err = rtSendDocument(doc, m_fd, &m_ns_dest);
   if (err != RT_OK)
     return err;
 
@@ -239,6 +230,7 @@ rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteEndpointP
       else
       {
         err = rtRemoteDocumentToEndpoint(searchResponse, endpoint);
+        rtLogInfo("\n\nUNICASTRESOLVER: received location as %s\n\n", endpoint->toUriString().c_str());
         if (err != RT_OK)
           return err;
       }
@@ -278,10 +270,10 @@ rtRemoteUnicastResolver::close()
       ::close(m_shutdown_pipe[1]);
   }
 
-  if (m_static_fd != -1)
-    ::close(m_static_fd);
+  if (m_fd != -1)
+    ::close(m_fd);
 
-  m_static_fd = -1;
+  m_fd = -1;
   m_shutdown_pipe[0] = -1;
   m_shutdown_pipe[1] = -1;
 
@@ -304,15 +296,9 @@ rtRemoteUnicastResolver::init()
     return err;
   }
 
-  // TODO change from multicast_interface eventually.  works for now
-  std::string srcaddr = m_env->Config->resolver_multicast_interface();
-  err = rtParseAddress(m_static_endpoint, srcaddr.c_str(), 0, nullptr);
+  err = rtGetDefaultInterface(m_static_endpoint, 0);
   if (err != RT_OK)
-  {
-    err = rtGetDefaultInterface(m_static_endpoint, 0);
-    if (err != RT_OK)
-      return err;
-  }
+    return err;
 
   return err;
 }
@@ -322,20 +308,20 @@ rtRemoteUnicastResolver::openSocket()
 {
   int ret = 0;
 
-  m_static_fd = socket(m_static_endpoint.ss_family, SOCK_DGRAM, 0);
-  if (m_static_fd < 0)
+  m_fd = socket(m_static_endpoint.ss_family, SOCK_DGRAM, 0);
+  if (m_fd < 0)
   {
     rtError e = rtErrorFromErrno(errno);
     rtLogError("failed to create unicast socket with family: %d. %s", 
       m_static_endpoint.ss_family, rtStrError(e));
     return e;
   }
-  fcntl(m_static_fd, F_SETFD, fcntl(m_static_fd, F_GETFD) | FD_CLOEXEC);
+  fcntl(m_fd, F_SETFD, fcntl(m_fd, F_GETFD) | FD_CLOEXEC);
 
   rtSocketGetLength(m_static_endpoint, &m_static_len);
 
   // listen on ANY port
-  ret = bind(m_static_fd, reinterpret_cast<sockaddr *>(&m_static_endpoint), m_static_len);
+  ret = bind(m_fd, reinterpret_cast<sockaddr *>(&m_static_endpoint), m_static_len);
   if (ret < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -345,7 +331,7 @@ rtRemoteUnicastResolver::openSocket()
 
   // now figure out which port we're bound to
   rtSocketGetLength(m_static_endpoint, &m_static_len);
-  ret = getsockname(m_static_fd, reinterpret_cast<sockaddr *>(&m_static_endpoint), &m_static_len);
+  ret = getsockname(m_fd, reinterpret_cast<sockaddr *>(&m_static_endpoint), &m_static_len);
   if (ret < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -389,11 +375,11 @@ rtRemoteUnicastResolver::runListener()
     fd_set err_fds;
 
     FD_ZERO(&read_fds);
-    rtPushFd(&read_fds, m_static_fd, &maxFd);
+    rtPushFd(&read_fds, m_fd, &maxFd);
     rtPushFd(&read_fds, m_shutdown_pipe[0], &maxFd);
 
     FD_ZERO(&err_fds);
-    rtPushFd(&err_fds, m_static_fd, &maxFd);
+    rtPushFd(&err_fds, m_fd, &maxFd);
 
     int ret = select(maxFd + 1, &read_fds, NULL, &err_fds, NULL);
     if (ret == -1)
@@ -409,8 +395,8 @@ rtRemoteUnicastResolver::runListener()
       return;
     }
 
-    if (FD_ISSET(m_static_fd, &read_fds))
-      doRead(m_static_fd, buff);
+    if (FD_ISSET(m_fd, &read_fds))
+      doRead(m_fd, buff);
   }  
 }
 
