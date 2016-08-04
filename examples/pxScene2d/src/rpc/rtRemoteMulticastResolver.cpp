@@ -40,6 +40,7 @@ rtRemoteMulticastResolver::rtRemoteMulticastResolver(rtRemoteEnvPtr env)
   , m_pid(getpid())
   , m_command_handlers()
   , m_env(env)
+  , m_endpoint_mapper(env)
 {
   memset(&m_mcast_dest, 0, sizeof(m_mcast_dest));
   memset(&m_mcast_src, 0, sizeof(m_mcast_src));

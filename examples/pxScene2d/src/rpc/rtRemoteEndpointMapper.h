@@ -10,17 +10,26 @@ class rtRemoteIEndpointMapper
 {
 public:
   virtual ~rtRemoteIEndpointMapper() { }
+  virtual rtError init() = 0;
   virtual rtError registers(std::string const& objectId, rtRemoteEndpointPtr const& endpoint) = 0;
   virtual rtError deregister(std::string const& objectId) = 0;
   virtual rtError locate(std::string const& objectId, rtRemoteEndpointPtr& endpoint) = 0; 
-  virtual bool isRegistered(std::string const& objectId) = 0; 
+  virtual bool isRegistered(std::string const& objectId) = 0;
+
+protected:
+  rtRemoteIEndpointMapper(rtRemoteEnvPtr env)
+  : m_env(env)
+  { }
+protected:
+  rtRemoteEnvPtr m_env; 
 };
 
 class rtRemoteEndpointMapperSimple : public virtual rtRemoteIEndpointMapper
 {
 public:
-  rtRemoteEndpointMapperSimple();
+  rtRemoteEndpointMapperSimple(rtRemoteEnvPtr env);
 public:
+  virtual rtError init() override;
   virtual rtError registers(std::string const& objectId, rtRemoteEndpointPtr const& endpoint) override;
   virtual rtError deregister(std::string const& objectId) override;
   virtual rtError locate(std::string const& objectId, rtRemoteEndpointPtr& endpoint) override; 
@@ -35,12 +44,15 @@ private:
 class rtRemoteEndpointMapperFile : public virtual rtRemoteIEndpointMapper
 {
 public:
-  rtRemoteEndpointMapperFile();
+  rtRemoteEndpointMapperFile(rtRemoteEnvPtr env);
 public:
+  virtual rtError init() override;
   virtual rtError registers(std::string const& objectId, rtRemoteEndpointPtr const& endpoint) override;
   virtual rtError deregister(std::string const& objectId) override;
   virtual rtError locate(std::string const& objectId, rtRemoteEndpointPtr& endpoint) override; 
   virtual bool isRegistered(std::string const& objectId) override;
+private:
+  FILE* m_fp;
 };
 
 // class rtRemoteEndpointMapperDatabase : public rtRemoteIEndpointMapper
