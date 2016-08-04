@@ -2,13 +2,16 @@
 #include "rtSocketUtils.h"
 #include "rtRemoteMessage.h"
 #include "rtRemoteConfig.h"
+#include "rtRemoteTypes.h"
+#include "rtRemoteUtils.h"
+#include "rtRemoteEndpoint.h"
 
+#include <memory>
 #include <condition_variable>
 #include <thread>
 #include <mutex>
 
 #include <rtLog.h>
-
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
@@ -19,8 +22,6 @@
 #include <ifaddrs.h>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 
 #include <rapidjson/document.h>
 #include <rapidjson/memorystream.h>
@@ -106,31 +107,8 @@ rtRemoteMulticastResolver::init()
 }
 
 rtError
-rtRemoteMulticastResolver::open(sockaddr_storage const& rpc_endpoint)
+rtRemoteMulticastResolver::open()
 {
-  {
-    char buff[128];
-
-    void* addr = nullptr;
-    rtGetInetAddr(rpc_endpoint, &addr);
-
-    if (rpc_endpoint.ss_family == AF_UNIX)
-    {
-      m_rpc_addr = reinterpret_cast<const char*>(addr);
-      m_rpc_port = 0;
-    }
-    else
-    {
-      socklen_t len;
-      rtSocketGetLength(rpc_endpoint, &len);
-      char const* p = inet_ntop(rpc_endpoint.ss_family, addr, buff, len);
-      if (p)
-        m_rpc_addr = p;
-
-      rtGetPort(rpc_endpoint, &m_rpc_port);
-    }
-  }
-
   rtError err = init();
   if (err != RT_OK)
   {
@@ -318,28 +296,26 @@ rtRemoteMulticastResolver::onSearch(rtJsonDocPtr const& doc, sockaddr_storage co
   }
 
   int key = rtMessage_GetCorrelationKey(*doc);
-
-  auto itr = m_hosted_objects.end();
-
   char const* objectId = rtMessage_GetObjectId(*doc);
 
-  std::unique_lock<std::mutex> lock(m_mutex);
-  itr = m_hosted_objects.find(objectId);
-  lock.unlock();
+  rtRemoteEndpointPtr objectEndpoint;
+  m_endpoint_mapper.locate(objectId, objectEndpoint);
 
-  if (itr != m_hosted_objects.end())
+  if (objectEndpoint)
   {
-    rapidjson::Document doc;
-    doc.SetObject();
-    doc.AddMember(kFieldNameMessageType, kMessageTypeLocate, doc.GetAllocator());
-    doc.AddMember(kFieldNameObjectId, std::string(objectId), doc.GetAllocator());
-    doc.AddMember(kFieldNameIp, m_rpc_addr, doc.GetAllocator());
-    doc.AddMember(kFieldNamePort, m_rpc_port, doc.GetAllocator());
-    // echo kback to sender
-    doc.AddMember(kFieldNameSenderId, senderId->value.GetInt(), doc.GetAllocator());
-    doc.AddMember(kFieldNameCorrelationKey, key, doc.GetAllocator());
+    rtJsonDocPtr doc(new rapidjson::Document());
+    doc->SetObject();
+    doc->AddMember(kFieldNameMessageType, kMessageTypeLocate, doc->GetAllocator());
+    doc->AddMember(kFieldNameObjectId, std::string(objectId), doc->GetAllocator());
+    doc->AddMember(kFieldNameSenderId, senderId->value.GetInt(), doc->GetAllocator());
+    doc->AddMember(kFieldNameCorrelationKey, key, doc->GetAllocator());
 
-    return rtSendDocument(doc, m_ucast_fd, &soc);
+    rtJsonDocPtr endpoint_doc(new rapidjson::Document());
+    endpoint_doc->SetObject();
+    rtRemoteEndpointToDocument(objectEndpoint, endpoint_doc);
+    rtRemoteCombineDocuments(doc, endpoint_doc);
+
+    return rtSendDocument(*doc, m_ucast_fd, &soc);
   }
   
   return RT_OK;
@@ -359,7 +335,7 @@ rtRemoteMulticastResolver::onLocate(rtJsonDocPtr const& doc, sockaddr_storage co
 }
 
 rtError
-rtRemoteMulticastResolver::locateObject(std::string const& name, sockaddr_storage& endpoint, uint32_t timeout)
+rtRemoteMulticastResolver::locateObject(std::string const& name, rtRemoteEndpointPtr& endpoint, uint32_t timeout)
 {
   if (m_ucast_fd == -1)
   {
@@ -407,12 +383,7 @@ rtRemoteMulticastResolver::locateObject(std::string const& name, sockaddr_storag
   // response is in itr
   if (searchResponse)
   {
-    RT_ASSERT(searchResponse->HasMember(kFieldNameIp));
-    RT_ASSERT(searchResponse->HasMember(kFieldNamePort));
-
-    rtError err = rtParseAddress(endpoint, (*searchResponse)[kFieldNameIp].GetString(),
-        (*searchResponse)[kFieldNamePort].GetInt(), nullptr);
-
+    err = rtRemoteDocumentToEndpoint(searchResponse, endpoint);
     if (err != RT_OK)
       return err;
   }
@@ -504,9 +475,7 @@ rtRemoteMulticastResolver::doDispatch(char const* buff, int n, sockaddr_storage*
     return;
   }
 
-  // https://isocpp.org/wiki/faq/pointers-to-members#macro-for-ptr-to-memfn
-  #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
-
+  // defined in rtRemoteTypes
   err = CALL_MEMBER_FN(*this, itr->second)(doc, *peer);
   if (err != RT_OK)
   {
@@ -554,10 +523,15 @@ rtRemoteMulticastResolver::close()
 }
 
 rtError
-rtRemoteMulticastResolver::registerObject(std::string const& name, sockaddr_storage const& endpoint)
+rtRemoteMulticastResolver::registerObject(std::string const& name, rtRemoteEndpointPtr endpoint)
 {
-  std::unique_lock<std::mutex> lock(m_mutex);
-  m_hosted_objects[name] = endpoint;
-  lock.unlock(); // TODO this wasn't here before.  Make sure it's right to put it here
+  m_endpoint_mapper.registers(name, endpoint);
+  return RT_OK;
+}
+
+rtError
+rtRemoteMulticastResolver::deregisterObject(std::string const& name)
+{
+  // TODO
   return RT_OK;
 }

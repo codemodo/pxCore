@@ -1,40 +1,40 @@
 #include "rtRemoteFactory.h"
 #include "rtRemoteConfig.h"
 #include "rtRemoteIResolver.h"
-#include "rtRemoteFileResolver.h"
 #include "rtRemoteMulticastResolver.h"
-#include "rtRemoteNsResolver.h"
+#include "rtRemoteUnicastResolver.h"
 #include "rtRemoteTypes.h"
 #include "rtRemoteUtils.h"
+#include "rtRemoteLocalResolver.h"
+#include <algorithm>
 
 static rtResolverType
 rtResolverTypeFromString(std::string const& resolverType)
 {
   char const* s = resolverType.c_str();
 
-  rtResolverType t = RT_RESOLVER_MULTICAST;
+  rtResolverType t = rtResolverType::MULTICAST;
   if (s != nullptr)
   {
     if (strcasecmp(s, "multicast") == 0)
-      t = RT_RESOLVER_MULTICAST;
+      t = rtResolverType::MULTICAST;
     else if (strcasecmp(s, "file") == 0)
-      t = RT_RESOLVER_FILE;
+      t = rtResolverType::FILE;
     else if (strcasecmp(s, "unicast") == 0)
-      t = RT_RESOLVER_UNICAST;
+      t = rtResolverType::UNICAST;
     else
       RT_ASSERT(false);
   }
   return t;
 };
 
-
 rtRemoteFactory::rtRemoteFactory(rtRemoteEnvironment* env)
 : m_env(env)
 , m_command_handlers()
 {
-  // empty
-  // The thought was that here we'd read in any functions specified in the config
-  // and insert them into the command handlers
+  registerFunctionCreateEndpoint("tcp", &rtRemoteFactory::onCreateEndpointTcp);
+  registerFunctionCreateEndpoint("udp", &rtRemoteFactory::onCreateEndpointUdp);
+  registerFunctionCreateEndpoint("shmem", &rtRemoteFactory::onCreateEndpointShmem);
 }
 
 rtRemoteFactory::~rtRemoteFactory()
@@ -43,7 +43,7 @@ rtRemoteFactory::~rtRemoteFactory()
 }
 
 rtError
-rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteIAddress *&))
+rtRemoteFactory::registerFunctionCreateEndpoint(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteEndpointPtr&))
 {
   if (m_command_handlers.find(scheme) != m_command_handlers.end())
   {
@@ -55,38 +55,38 @@ rtRemoteFactory::registerFunctionCreateAddress(std::string const& scheme, rtErro
 }
 
 rtError
-rtRemoteFactory::updateFunctionCreateAddress(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteIAddress *&))
+rtRemoteFactory::updateFunctionCreateEndpoint(std::string const& scheme, rtError (*f) (std::string const&, rtRemoteEndpointPtr&))
 {
   m_command_handlers.insert(AddrCommandHandlerMap::value_type(scheme, f));
   return RT_OK;
 }
 
-rtRemoteIResolver*
-rtRemoteFactory::createResolver(rtRemoteEnvironment* env)
+rtError
+rtRemoteFactory::createResolver(rtRemoteResolverPtr& resolver)
 {
-  rtRemoteIResolver* resolver = nullptr;
-  rtResolverType t = rtResolverTypeFromString(env->Config->resolver_type());
+  rtResolverType t = rtResolverTypeFromString(m_env->Config->resolver_type());
+  t = rtResolverType::MULTICAST;
 
   switch (t)
   {
-    case RT_RESOLVER_MULTICAST:
-      resolver = new rtRemoteMulticastResolver(env);
+    case rtResolverType::MULTICAST:
+      resolver = new rtRemoteMulticastResolver(m_env);
       break;
-    case RT_RESOLVER_FILE:
-      resolver = new rtRemoteFileResolver(env);
+    case rtResolverType::FILE:
+      resolver = new rtRemoteLocalResolver(m_env);
       break;
-    case RT_RESOLVER_UNICAST:
-      resolver = new rtRemoteNsResolver(env);
+    case rtResolverType::UNICAST:
+      resolver = new rtRemoteUnicastResolver(m_env);
       break;
     default:
-      resolver = new rtRemoteMulticastResolver(env);
+      resolver = new rtRemoteMulticastResolver(m_env);
       break;
   }
-  return resolver;
+  return RT_OK;
 }
 
 rtError
-rtRemoteFactory::createAddress(std::string const& uri, rtRemoteIAddress*& endpoint_addr)
+rtRemoteFactory::createEndpoint(std::string const& uri, rtRemoteEndpointPtr& endpoint)
 {
   std::string scheme = uri.substr(0, uri.find(":"));
   
@@ -96,9 +96,121 @@ rtRemoteFactory::createAddress(std::string const& uri, rtRemoteIAddress*& endpoi
     rtLogError("no command handler registered for: %s", scheme.c_str());
     return RT_FAIL;
   }
+  return itr->second(uri, endpoint);
+}
+
+rtError
+rtRemoteFactory::onCreateEndpointTcp(std::string const& uri, rtRemoteEndpointPtr& endpoint)
+{
+  std::string scheme;
+  std::string path;
+  std::string host;
+  uint16_t* port = nullptr;
+
+  rtError e;
+  e = rtRemoteParseUri(uri, scheme, path, host, port);
+  if (e != RT_OK)
+    return e;
   
-  #define CALL_MEMBER_FN(ptrToMember)  (*(ptrToMember))
-  return CALL_MEMBER_FN(itr->second)(uri, endpoint_addr);
+  RT_ASSERT(!scheme.empty());
+  
+  // double check that correct create function is being used
+  char const* s = scheme.c_str();
+  if (s != nullptr)
+  {
+    if (strcasecmp(s, "tcp") != 0)
+    {
+      rtLogError("failed to create endpoint addr from uri: %s.  invalid scheme", uri.c_str());
+      return RT_FAIL;
+    }
+  }
+  // make lowercase for consistency
+  std::transform(scheme.begin(), scheme.end(), scheme.begin(), ::tolower);
+
+  if (!path.empty())
+  { // local socket
+    endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
+  }
+  else if (!host.empty() && port != nullptr)
+  {
+    endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, *port);   
+  }
+  return RT_OK;
+}
+
+rtError
+rtRemoteFactory::onCreateEndpointUdp(std::string const& uri, rtRemoteEndpointPtr& endpoint)
+{
+  std::string scheme;
+  std::string path;
+  std::string host;
+  uint16_t* port = nullptr;
+
+  rtError e;
+  e = rtRemoteParseUri(uri, scheme, path, host, port);
+  if (e != RT_OK)
+    return e;
+  
+  RT_ASSERT(!scheme.empty());
+  
+  // double check that correct create function is being used
+  char const* s = scheme.c_str();
+  if (s != nullptr)
+  {
+    if (strcasecmp(s, "udp") != 0)
+    {
+      rtLogError("failed to create endpoint addr from uri: %s.  invalid scheme", uri.c_str());
+      return RT_FAIL;
+    }
+  }
+  // make lowercase for consistency
+  std::transform(scheme.begin(), scheme.end(), scheme.begin(), ::tolower);
+
+  if (!path.empty())
+  { // local socket
+    endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
+  }
+  else if (!host.empty() && port != nullptr)
+  {
+    endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, *port);   
+  }
+  return RT_OK;
+}
+
+rtError
+rtRemoteFactory::onCreateEndpointShmem(std::string const& uri, rtRemoteEndpointPtr& endpoint)
+{
+  std::string scheme;
+  std::string path;
+  std::string host;
+  uint16_t* port = nullptr;
+
+  rtError e;
+  e = rtRemoteParseUri(uri, scheme, path, host, port);
+  if (e != RT_OK)
+    return e;
+  
+  RT_ASSERT(!scheme.empty());
+  RT_ASSERT(!path.empty());
+  RT_ASSERT(host.empty());
+  RT_ASSERT(port == nullptr);
+
+  // double check that correct create function is being used
+  char const* s = scheme.c_str();
+  if (s != nullptr)
+  {
+    if (strcasecmp(s, "shmem") != 0)
+    {
+      rtLogError("failed to shmem endpoint from uri: %s.  invalid scheme", uri.c_str());
+      return RT_FAIL;
+    }
+  }
+  // make lowercase for consistency
+  std::transform(scheme.begin(), scheme.end(), scheme.begin(), ::tolower);
+
+  endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
+
+  return RT_OK;
 }
 
 

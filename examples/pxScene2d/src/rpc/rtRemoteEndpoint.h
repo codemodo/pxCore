@@ -1,36 +1,19 @@
 #ifndef __RT_REMOTE_ENDPOINT_H__
 #define __RT_REMOTE_ENDPOINT_H__
 
-#include <string>
 #include "rtRemoteTypes.h"
-#include "rtRemoteUtils.h"
 #include <sys/socket.h>
-#include <condition_variable>
-#include <map>
-#include <mutex>
 #include <string>
-#include <thread>
-
 #include <stdint.h>
-#include <netinet/in.h>
-#include <rtObject.h>
-#include <rapidjson/document.h>
-
-#include "rtRemoteIResolver.h"
-#include "rtSocketUtils.h"
-#include "rtRemoteEndpoint.h"
-
-
-
 
 /* Abstract base class for endpoint addresses */
-class rtRemoteIAddress
+class rtRemoteIEndpoint
 {
 public:
-	rtRemoteIAddress(std::string const& scheme);
-	virtual ~rtRemoteIAddress();
+	rtRemoteIEndpoint(std::string const& scheme);
+	virtual ~rtRemoteIEndpoint();
 
-	virtual std::string toUri() = 0;
+	virtual std::string toUriString() = 0;
 
 	inline std::string scheme() const
 	  { return m_scheme; }
@@ -39,78 +22,86 @@ protected:
 	std::string m_scheme;
 };
 
-/* Local endpoint addresses */
-class rtRemoteLocalAddress : public virtual rtRemoteIAddress
+/* Local endpoints.
+ * Used to stored address information for unix domain sockets,
+ * named pipes, files, shared memory, etc.
+ */
+class rtRemoteEndpointLocal : public virtual rtRemoteIEndpoint
 {
 public:
-	rtRemoteLocalAddress(std::string const& scheme, std::string const& path);
+	rtRemoteEndpointLocal(std::string const& scheme, std::string const& path);
 	
-	virtual std::string toUri() override;
+	virtual std::string toUriString() override;
 
-	bool isSocket();
+	bool isSocket() const;
 
 	inline std::string path() const
 	  { return m_path; }
+	
+	inline bool operator==(rtRemoteEndpointLocal const& rhs) const
+	  { return m_path.compare(rhs.path()) == 0
+		      && m_scheme.compare(rhs.scheme()) == 0;
+		}
 
 protected:
 	std::string m_path;
 };
 
-/* Remote endpoint addresses */
-class rtRemoteNetAddress : public virtual rtRemoteIAddress
+/* Remote endpoints.
+ * Used to stored address information for remote sockets
+ * (tcp, udp, http, etc.)
+ */
+class rtRemoteEndpointRemote : public virtual rtRemoteIEndpoint
 {
 public:
-  rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port);
-	rtRemoteNetAddress(std::string const& scheme, std::string const& host, int port, NetType nt, CastType ct);
+  rtRemoteEndpointRemote(std::string const& scheme, std::string const& host, int port);
 	
-	virtual std::string toUri() override;
+	virtual std::string toUriString() override;
 
 	inline std::string host() const
 	  { return m_host; }
 
 	inline int port() const
 	  { return m_port; }
-
-	inline NetType netType() const
-	  { return m_net_type; }
-
-	inline CastType castType() const
-	  { return m_cast_type; }
+	
+	inline bool operator==(rtRemoteEndpointRemote const& rhs) const
+	  { return m_host.compare(rhs.host()) == 0
+		      && m_port == rhs.port()
+		      && m_scheme.compare(rhs.scheme()) == 0;
+		}
 
 protected:
 	std::string         m_host;
 	int                 m_port;
-	NetType  m_net_type;
-	CastType m_cast_type;
 };
 
-/* Remote endpoint addresses with path */
-class rtRemoteDistributedAddress : public rtRemoteNetAddress, public rtRemoteLocalAddress
+/* Remote endpoints that include path information
+ *
+ * Currently not used.  If use case arises, must be integrated throughout the code.
+ */
+class rtRemoteEndpointDistributed : public rtRemoteEndpointRemote, public rtRemoteEndpointLocal
 {
 public:
-	rtRemoteDistributedAddress(std::string const& scheme, std::string const& host, int port, std::string const& path);
-	virtual std::string toUri() override;
+	rtRemoteEndpointDistributed(std::string const& scheme, std::string const& host, int port, std::string const& path);
+	virtual std::string toUriString() override;
 };
-
-
 
 
 /////////////////////////
-// Endpoint abstractions                 
+// Endpoint handles                 
 /////////////////////////
 
-class rtRemoteIEndpoint
+class rtRemoteIEndpointHandle
 {
 public:
-  rtRemoteIEndpoint(rtRemoteIAddress* const addr);
-  virtual ~rtRemoteIEndpoint();
+  virtual ~rtRemoteIEndpointHandle();
 
   /* Should create fd */
   virtual rtError open() = 0;
 	virtual rtError close() = 0;
   
-  inline rtRemoteIAddress* address() const
-    { return m_addr; }
+  // inline rtRemoteIEndpoint address() const
+  //   { return *m_addr; }
   
   inline int fd() const
     { return m_fd; }
@@ -118,25 +109,23 @@ public:
 	inline void setFd(int fd)
 	  { m_fd = fd; }
 
-	inline void setAddr(rtRemoteIAddress* addr)
-	  { m_addr = addr; }
-
 protected:
-  rtRemoteIAddress* m_addr;
+  rtRemoteIEndpointHandle(rtRemoteEndpointPtr endpoint);
+  rtRemoteEndpointPtr m_addr;
   int m_fd;
 };
 
-class rtRemoteStreamEndpoint
+class rtRemoteIStreamEndpoint
 {
 	//TODO constructors and args for below methods
   virtual rtError send(int fd) = 0;
 	virtual rtError receive(int fd) = 0;
 };
 
-class rtRemoteStreamServerEndpoint : public rtRemoteStreamEndpoint, public virtual rtRemoteIEndpoint
+class rtRemoteStreamServerEndpoint : public virtual rtRemoteIEndpointHandle, public rtRemoteIStreamEndpoint
 {
 public:
-  rtRemoteStreamServerEndpoint(rtRemoteIAddress* const addr);
+  rtRemoteStreamServerEndpoint(rtRemoteEndpointPtr endpoint);
   
   virtual rtError open() override;
 	virtual rtError close() override;
@@ -144,53 +133,66 @@ public:
 	virtual rtError receive(int fd) override;
 	rtError doBind();
 	rtError doListen();
-	rtError doAccept(int& new_fd, rtRemoteIAddress*& remote_addr);
-	rtError doAccept(int& new_fd, sockaddr_storage& remote_addr);
+	rtError doAccept(int& new_fd, rtRemoteEndpointPtr& remote_addr);
 
 	inline sockaddr_storage sockaddr() const
 	  { return m_socket; }
 
 	sockaddr_storage m_socket;
 };
-
-class rtRemoteStreamClientEndpoint : public virtual rtRemoteIEndpoint
+/*
+class rtRemoteStreamClientEndpoint : public virtual rtRemoteIEndpointHandle, public rtRemoteIStreamEndpoint
 {
 public:
-  //rtRemoteStreamClientEndpoint(rtRemoteIAddress* const addr);
+  rtRemoteStreamClientEndpoint(const rtRemoteIAddress* const addr);
+	virtual rtError open() override;
+	virtual rtError close() override;
+	//virtual rtError send(int fd) override;
+	//virtual rtError receive(int fd) override;
+};
+
+class rtRemoteDatagramServerEndpoint : public virtual rtRemoteIEndpointHandle
+{
+public:
+  rtRemoteDatagramServerEndpoint(const rtRemoteIAddress* const addr);
+	virtual rtError open() override;
+	virtual rtError close() override;
+  // rtError doBind();
+	// rtError doListen();
+	// rtError receive();
+};
+
+class rtRemoteDatagramClientEndpoint : public virtual rtRemoteIEndpointHandle
+{
+public:
+  rtRemoteDatagramClientEndpoint(const rtRemoteIAddress* const addr);
+	virtual rtError open() override;
+	virtual rtError close() override;
+	// rtError send();
+};
+
+class rtRemoteSharedMemoryEndpoint : public virtual rtRemoteIEndpointHandle
+{
+public:
+  rtRemoteSharedMemoryEndpoint(const rtRemoteIAddress* const addr);
 	virtual rtError open() override;
 	virtual rtError close() override;
 };
 
-class rtRemoteDatagramServerEndpoint : public virtual rtRemoteIEndpoint
+class rtRemoteFileEndpoint : public virtual rtRemoteIEndpointHandle
 {
 public:
-  //rtRemoteDatagramServerEndpoint(rtRemoteIAddress* const addr);
+  rtRemoteFileEndpoint(const rtRemoteIAddress* const addr);
 	virtual rtError open() override;
 	virtual rtError close() override;
 };
 
-class rtRemoteDatagramClientEndpoint : public virtual rtRemoteIEndpoint
+class rtRemoteNamedPipeEndpoint : public virtual rtRemoteIEndpointHandle
 {
 public:
-  //rtRemoteDatagramServerEndpoint(rtRemoteIAddress* const addr);
+  rtRemoteNamedPipeEndpoint(const rtRemoteIAddress* const addr);
 	virtual rtError open() override;
 	virtual rtError close() override;
 };
-
-
+*/
 #endif
-
-// class rtRemoteILocalResource : public virtual rtRemoteIResource
-// {
-// public:
-//   rtRemoteILocalResource(rtEndpointAddr const& ep_addr);
-//   ~rtRemoteILocalResource();
-// };
-
-
-// class rtRemoteINetworkResource : public virtual rtRemoteIResource
-// {
-// public:
-//   rtRemoteINetworkResource(rtEndpointAddr const& ep_addr);
-//   ~rtRemoteINetworkResource();
-// };

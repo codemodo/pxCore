@@ -11,6 +11,7 @@
 
 #include "rtRemoteTypes.h"
 #include "rtSocketUtils.h"
+#include "rtRemoteLocalResolver.h"
 
 class rtRemoteNameService
 {
@@ -26,7 +27,7 @@ private:
   using CommandHandler = rtError (rtRemoteNameService::*)(rtJsonDocPtr const&, sockaddr_storage const&);
   using CommandHandlerMap = std::map< std::string, CommandHandler >;
   using RequestMap = std::map< rtCorrelationKey, rtJsonDocPtr >;
-  using RegisteredObjectsMap = std::map< std::string, sockaddr_storage >;
+  using RegisteredObjectsMap = std::map< std::string, rtRemoteEndpointPtr>;
 
   rtError onRegister(rtJsonDocPtr const& doc, sockaddr_storage const& soc);
   rtError onDeregister(rtJsonDocPtr const& doc, sockaddr_storage const& soc);
@@ -53,4 +54,5 @@ private:
   std::unique_ptr<std::thread> m_read_thread;
   int		                       m_shutdown_pipe[2];
   rtRemoteEnvPtr               m_env;
+  rtRemoteLocalResolver*       m_file_resolver;
 };

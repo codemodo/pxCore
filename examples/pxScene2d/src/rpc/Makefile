@@ -28,13 +28,14 @@ RTRPC_SRCS=\
   rtRemote.cpp \
   rtRemoteConfig.cpp \
   rtRemoteFactory.cpp \
-  rtRemoteFileResolver.cpp \
+  rtRemoteLocalResolver.cpp \
   rtRemoteMulticastResolver.cpp \
-  rtRemoteNsResolver.cpp \
+  rtRemoteUnicastResolver.cpp \
   rtRemoteNameService.cpp \
   rtRemoteConfigBuilder.cpp \
   rtRemoteEndpoint.cpp \
-  rtRemoteUtils.cpp
+  rtRemoteUtils.cpp \
+  rtRemoteEndpointMapper.cpp
 
 SAMPLEAPP_SRCS=\
   rpc_main.cpp

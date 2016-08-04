@@ -1,4 +1,7 @@
 #include "rtRemoteIResolver.h"
+#include "rtRemoteTypes.h"
+#include "rtSocketUtils.h"
+
 #include <condition_variable>
 #include <map>
 #include <mutex>
@@ -8,27 +11,24 @@
 #include <stdint.h>
 #include <netinet/in.h>
 #include <rtObject.h>
-#include <rapidjson/document.h>
 
-#include "rtRemoteTypes.h"
-#include "rtSocketUtils.h"
-
-class rtRemoteNsResolver : public rtRemoteIResolver
+class rtRemoteUnicastResolver : public rtRemoteIResolver
 {
 public:
-  rtRemoteNsResolver(rtRemoteEnvPtr env);
-  ~rtRemoteNsResolver();
+  rtRemoteUnicastResolver(rtRemoteEnvPtr env);
+  ~rtRemoteUnicastResolver();
 
 public:
-  virtual rtError open(sockaddr_storage const& rpc_endpoint) override;
+  virtual rtError open() override;
   virtual rtError close() override;
-  virtual rtError registerObject(std::string const& name, sockaddr_storage const& endpoint) override;
-  virtual rtError locateObject(std::string const& name, sockaddr_storage& endpoint,
+  virtual rtError registerObject(std::string const& name, rtRemoteEndpointPtr endpoint) override;
+  virtual rtError locateObject(std::string const& name, rtRemoteEndpointPtr& endpoint,
     uint32_t timeout) override;
-  rtError registerObject(std::string const& name, sockaddr_storage const& endpoint, uint32_t timeout);
+  virtual rtError deregisterObject(std::string const& name) override;
+  rtError registerObject(std::string const& name, rtRemoteEndpointPtr endpoint, uint32_t timeout);
 
 private:
-  using CommandHandler = rtError (rtRemoteNsResolver::*)(rtJsonDocPtr const&, sockaddr_storage const&);
+  using CommandHandler = rtError (rtRemoteUnicastResolver::*)(rtJsonDocPtr const&, sockaddr_storage const&);
   using HostedObjectsMap = std::map< std::string, sockaddr_storage >;
   using CommandHandlerMap = std::map< std::string, CommandHandler >;
   using RequestMap = std::map< rtCorrelationKey, rtJsonDocPtr >;
@@ -44,9 +44,8 @@ private:
   rtError onLocate(rtJsonDocPtr const& doc, sockaddr_storage const& soc);
 
 private:
-
   sockaddr_storage  m_static_endpoint;
-  int               m_static_fd;
+  int               m_fd;
   socklen_t         m_static_len;
 
   std::unique_ptr<std::thread> m_read_thread;
@@ -54,15 +53,10 @@ private:
   std::mutex        m_mutex;
   pid_t             m_pid;
   CommandHandlerMap m_command_handlers;
-  std::string       m_rpc_addr;
-  uint16_t          m_rpc_port;
   HostedObjectsMap  m_hosted_objects;
-  RequestMap	    m_pending_searches;
-  int		        m_shutdown_pipe[2];
+  RequestMap	      m_pending_searches;
+  int		            m_shutdown_pipe[2];
 
   sockaddr_storage  m_ns_dest;
   rtRemoteEnvPtr    m_env;
-
-  // endpointMapper;
-  // 
 };

@@ -101,6 +101,7 @@ static rtError my_callback(int /*argc*/, rtValue const* /*argv*/, rtValue* resul
 
 
 static char const* objectName = "com.xfinity.xsmart.Thermostat.JakesHouse";
+static char const* object2Name = "com.xfinity.xsmart.Thermostat.AlexsHouse";
 
 void Test_SetProperty_Basic_Client()
 {
@@ -201,7 +202,10 @@ void
 Test_MethodCall_Server()
 {
   rtObjectRef obj(new rtThermostat());
+  rtObjectRef obj2(new rtThermostat());
   rtError e = rtRemoteRegisterObject(env, objectName, obj);
+  rtRemoteRegisterObject(env, object2Name, obj2);
+  rtRemoteDeregisterObject(env, object2Name);
   RT_ASSERT(e == RT_OK);
   while (true)
   {
@@ -272,10 +276,11 @@ int main(int argc, char* /*argv*/[])
   // runs separate name server which communicates with resolver
   if (argc == 3)
   {
-    rtError e = rtRemoteInitNs(env);
+    rtRemoteNameService ns(env);
+    rtError e = ns.init();
     RT_ASSERT(e == RT_OK);
     while(1);
-    rtRemoteShutdownNs(env);
+    ns.close();
     return 0;
   }
   else

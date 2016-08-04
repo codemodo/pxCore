@@ -131,16 +131,17 @@ rtRemoteStreamSelector::pollFds()
   return RT_OK;
 }
 
-rtRemoteStream::rtRemoteStream(rtRemoteEnvPtr env, int fd, sockaddr_storage const& local_endpoint, sockaddr_storage const& remote_endpoint)
+rtRemoteStream::rtRemoteStream(rtRemoteEnvPtr env, int fd, rtRemoteEndpointPtr const& local_endpoint, rtRemoteEndpointPtr const& remote_endpoint)
   : m_fd(fd)
   , m_last_message_time(0)
   , m_last_ka_message_time(0)
   , m_message_handler(nullptr)
   , m_running(false)
   , m_env(env)
+  , m_local_endpoint(local_endpoint)
+  , m_remote_endpoint(remote_endpoint)
 {
-  memcpy(&m_remote_endpoint, &remote_endpoint, sizeof(m_remote_endpoint));
-  memcpy(&m_local_endpoint, &local_endpoint, sizeof(m_local_endpoint));
+  // empty
 }
 
 rtRemoteStream::~rtRemoteStream()
@@ -242,9 +243,13 @@ rtRemoteStream::connect()
 }
 
 rtError
-rtRemoteStream::connectTo(sockaddr_storage const& endpoint)
+rtRemoteStream::connectTo(rtRemoteEndpointPtr const& addr)
 {
-  m_fd = socket(endpoint.ss_family, SOCK_STREAM, 0);
+  sockaddr_storage endpoint_sockaddr;
+  memset(&endpoint_sockaddr, 0, sizeof(endpoint_sockaddr));
+  rtRemoteEndpointAddressToSocket(addr, endpoint_sockaddr);
+  m_fd = socket(endpoint_sockaddr.ss_family, SOCK_STREAM, 0);
+  rtLogInfo("\n\ntrying to connect to %s\n\n", addr->toUriString().c_str());
   if (m_fd < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -253,7 +258,7 @@ rtRemoteStream::connectTo(sockaddr_storage const& endpoint)
   }
   fcntl(m_fd, F_SETFD, fcntl(m_fd, F_GETFD) | FD_CLOEXEC);
 
-  if (endpoint.ss_family != AF_UNIX)
+  if (endpoint_sockaddr.ss_family != AF_UNIX)
   {
     uint32_t one = 1;
     if (-1 == setsockopt(m_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one)))
@@ -261,9 +266,9 @@ rtRemoteStream::connectTo(sockaddr_storage const& endpoint)
   }
 
   socklen_t len;
-  rtSocketGetLength(endpoint, &len);
+  rtSocketGetLength(endpoint_sockaddr, &len);
 
-  int ret = ::connect(m_fd, reinterpret_cast<sockaddr const *>(&endpoint), len);
+  int ret = ::connect(m_fd, reinterpret_cast<sockaddr const *>(&endpoint_sockaddr), len);
   if (ret < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -272,13 +277,19 @@ rtRemoteStream::connectTo(sockaddr_storage const& endpoint)
     return e;
   }
 
-  rtGetSockName(m_fd, m_local_endpoint);
-  rtGetPeerName(m_fd, m_remote_endpoint);
-
-  rtLogInfo("new connection (%d) %s --> %s",
-    m_fd,
-    rtSocketToString(m_local_endpoint).c_str(),
-    rtSocketToString(m_remote_endpoint).c_str());
+  if (m_local_endpoint)
+  {
+    rtLogInfo("new connection (%d) %s --> %s",
+      m_fd,
+      m_local_endpoint->toUriString().c_str(),
+      m_remote_endpoint->toUriString().c_str());
+  }
+  else
+  {
+    rtLogInfo("new connection (%d) --> %s",
+      m_fd,
+      m_remote_endpoint->toUriString().c_str());   
+  }
 
   return RT_OK;
 }

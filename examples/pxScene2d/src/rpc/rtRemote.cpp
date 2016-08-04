@@ -13,7 +13,6 @@
 
 #include <rtLog.h>
 
-static rtRemoteNameService* gNs = nullptr;
 static std::mutex gMutex;
 static rtRemoteEnvironment* gEnv = nullptr;
 
@@ -33,12 +32,12 @@ rtRemoteEnvironment::rtRemoteEnvironment(rtRemoteConfig* config)
   ObjectCache = new rtObjectCache(this);
 
   Factory = new rtRemoteFactory(this);
-  Factory->registerFunctionCreateAddress("tcp", &rtRemoteCreateTcpAddress);
 }
 
 rtRemoteEnvironment::~rtRemoteEnvironment()
 {
   delete Config;
+  delete Factory;
 }
 
 void
@@ -100,20 +99,6 @@ rtRemoteInit(rtRemoteEnvironment* env)
   return e;
 }
 
-rtError
-rtRemoteInitNs(rtRemoteEnvironment* env)
-{
-  rtError e = RT_OK;
-  //rtRemoteConfig::getInstance();
-  if (gNs == nullptr)
-  {
-    gNs = new rtRemoteNameService(env);
-    e = gNs->init();
-  }
-
-  return e;
-}
-
 extern rtError rtRemoteShutdownStreamSelector();
 
 rtError
@@ -142,17 +127,6 @@ rtRemoteShutdown(rtRemoteEnvironment* env)
 }
 
 rtError
-rtRemoteShutdownNs()
-{
-  if (gNs)
-  {
-    delete gNs;
-    gNs = nullptr;
-  }
-  return RT_OK;
-}
-
-rtError
 rtRemoteRegisterObject(rtRemoteEnvironment* env, char const* id, rtObjectRef const& obj)
 {
   if (env == nullptr)
@@ -168,6 +142,18 @@ rtRemoteRegisterObject(rtRemoteEnvironment* env, char const* id, rtObjectRef con
 }
 
 rtError
+rtRemoteDeregisterObject(rtRemoteEnvironment* env, char const* id)
+{
+  if (env == nullptr)
+    return RT_FAIL;
+
+  if (id == nullptr)
+    return RT_ERROR_INVALID_ARG;
+
+  return env->Server->deregisterObject(id);
+}
+
+rtError
 rtRemoteLocateObject(rtRemoteEnvironment* env, char const* id, rtObjectRef& obj)
 {
   if (env == nullptr)
@@ -177,6 +163,12 @@ rtRemoteLocateObject(rtRemoteEnvironment* env, char const* id, rtObjectRef& obj)
     return RT_ERROR_INVALID_ARG;
 
   return env->Server->findObject(id, obj, 3000);
+}
+
+rtError
+rtRemoteRegisterEndpointFactory(rtRemoteEnvironment* env, std::string const& scheme, rtError (*func) (std::string const&, rtRemoteEndpointPtr&))
+{
+  return env->Factory->registerFunctionCreateEndpoint(scheme, func);
 }
 
 rtError

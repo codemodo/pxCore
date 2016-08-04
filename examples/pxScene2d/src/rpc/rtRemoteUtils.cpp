@@ -1,14 +1,20 @@
 #include "rtRemoteUtils.h"
 #include "rtRemoteTypes.h"
+#include "rtRemoteEndpoint.h"
+#include "rtSocketUtils.h"
+#include "rtRemoteMessage.h"
+
 #include <sstream>
 #include <string>
-#include <arpa/inet.h>
+#include <memory>
+
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <sys/types.h>
-#include <netdb.h>
 
 
 //TODO Maybe remove CastType and NetType from rtRemoteIAddress
@@ -16,84 +22,20 @@
 //     given an address object
 
 rtError
-rtRemoteParseNetType(std::string const& host, NetType& result)
+rtRemoteEndpointAddressToSocket(rtRemoteEndpointPtr addr, sockaddr_storage& ss)
 {
-  int ret;
-  struct addrinfo hint, *res = NULL;
-  memset(&hint, 0, sizeof hint);
-  
-  hint.ai_family = AF_UNSPEC;
-  hint.ai_flags = AI_NUMERICHOST;
-
-  ret = getaddrinfo(host.c_str(), NULL, &hint, &res);
-  if (ret)
+  if (auto local = dynamic_pointer_cast<rtRemoteEndpointLocal>(addr))
   {
-    result = NetType::UNK;
-    freeaddrinfo(res);
-    rtError e = rtErrorFromErrno(errno);
-    rtLogWarn("unable to determine NetType (network layer protocol) for host: %s", host.c_str());
-    return e;
-  }
-  else
-  {
-    if (res->ai_family == AF_INET)
-      result = NetType::IPV4;
-    else if (res->ai_family == AF_INET6)
-      result = NetType::IPV6;
-    else
-    {
-      result = NetType::UNK;
-      freeaddrinfo(res);
-      rtLogWarn("unable to determine NetType (network layer protocol) for host: %s", host.c_str());
-      return RT_FAIL;
-    }
-  }
-  return RT_OK;
-}
-
-rtError
-rtRemoteParseCastType(std::string const& host, NetType const& net_type, CastType& result)
-{
-  std::string prefix;
-  if (net_type == NetType::IPV4)
-  {
-    prefix = host.substr(0, host.find('.'));
-    if (stoi(prefix) >= 224 && stoi(prefix) <= 239)
-      result = CastType::MULTI;
-    else
-      result = CastType::UNI;
-  }
-  else if (net_type == NetType::IPV6)
-  {
-    prefix = host.substr(0, 2);
-    if (prefix.compare("FF") == 0)
-      result = CastType::MULTI;
-    else
-      result = CastType::UNI;
-  }
-  else
-   result = CastType::UNK;
-
-  return RT_OK;       
-}
-
-rtError
-rtRemoteEndpointAddressToSocket(rtRemoteIAddress*& addr, sockaddr_storage& ss)
-{
-  if (dynamic_cast<rtRemoteLocalAddress*>(addr) != nullptr)
-  {
-    rtRemoteLocalAddress* tmp = dynamic_cast<rtRemoteLocalAddress*>(addr);
-    if (!tmp->isSocket())
+    if (!local->isSocket())
     {
       rtLogError("local address is not unix domain socket");
       return RT_FAIL;
     }
-    return rtParseAddress(ss, tmp->path().c_str(), 0, nullptr);
+    return rtParseAddress(ss, local->path().c_str(), 0, nullptr);
   }
-  else if (dynamic_cast<rtRemoteNetAddress*>(addr) != nullptr)
+  else if (auto net = dynamic_pointer_cast<rtRemoteEndpointRemote>(addr))
   {
-    rtRemoteNetAddress* tmp = dynamic_cast<rtRemoteNetAddress*>(addr);
-    return rtParseAddress(ss,tmp->host().c_str(), tmp->port(), nullptr);
+    return rtParseAddress(ss, net->host().c_str(), net->port(), nullptr);
   }
   else
   {
@@ -103,16 +45,16 @@ rtRemoteEndpointAddressToSocket(rtRemoteIAddress*& addr, sockaddr_storage& ss)
 
 //TODO Better error handling here
 rtError
-rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn_type, rtRemoteIAddress*& endpoint_addr)
+rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, rtConnType const& conn_type, rtRemoteEndpointPtr& endpoint)
 {
   std::stringstream buff;
   
   std::string scheme;
-  if (conn_type == ConnType::STREAM)
+  if (conn_type == rtConnType::STREAM)
   {
     scheme = "tcp";
   }
-  else if (conn_type == ConnType::DGRAM)
+  else if (conn_type == rtConnType::DGRAM)
   {
     scheme = "udp";
   }
@@ -131,12 +73,12 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
   char addr_buff[128];
   memset(addr_buff, 0, sizeof(addr_buff));
 
-  // TODO need to figure out env thing
   if (ss.ss_family == AF_UNIX)
   {
     strncpy(addr_buff, (const char*)addr, sizeof(addr_buff) -1);
     buff << addr_buff;
-    return rtRemoteCreateTcpAddress(buff.str(), endpoint_addr);
+    endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, addr_buff);
+    return RT_OK;
   }
   else
   {
@@ -146,64 +88,239 @@ rtRemoteSocketToEndpointAddress(sockaddr_storage const& ss, ConnType const& conn
     buff << addr_buff;
     buff << ":";
     buff << port;
-    return rtRemoteCreateTcpAddress(buff.str(), endpoint_addr);
+    endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, addr_buff, port);
+    return RT_OK;
   }
   return RT_OK;
 }
 
 //TODO Better error handling here
 rtError
-rtRemoteCreateTcpAddress(std::string const& uri, rtRemoteIAddress*& endpoint_addr)
+rtRemoteParseUri(std::string const& uri, std::string& scheme, std::string& path, std::string& host, uint16_t* port)
 {
-  size_t index;
-  index = uri.find("://");
+  size_t index = uri.find("://");
   if (index == std::string::npos)
   {
-   rtLogError("invalid uri: %s", uri.c_str());
+   rtLogError("Invalid uri: %s. Expected: <scheme>://<host>[:<port>][<path>]", uri.c_str());
    return RT_FAIL;
   }
-  
-  // extract scheme
-  std::string scheme;
-  scheme = uri.substr(0, index);
-  char const* s = scheme.c_str();
-  if (s != nullptr)
-  {
-    if (strcasecmp(s, "tcp") != 0)
-    {
-      rtLogError("cannot create tcp addr from uri: %s", uri.c_str());
-      return RT_FAIL;
-    }
-  }
 
-  // extract remaining info
+  // extract scheme
+  scheme = uri.substr(0, index);
+
+  // We either have a path or host now.  Let's pull the remaining info.
   index += 3;
   char ch = uri.at(index);
   if (ch == '/' || ch == '.')
+  { // local socket
+    path = uri.substr(index, std::string::npos);
+  }
+  else
+  { // network socket
+    // get port
+    std::string port_string;
+    size_t index_port = uri.find_last_of(":");
+    if (index_port == std::string::npos // no port. no colon found
+      || uri.at(index_port-1) == ':' // no port. colon was part of ipv6 addr
+      || index_port == index-3) // no port.  last colon equals colon in ://
+    {
+      rtLogWarn("No port included included in URI: %s. Defaulting to 0", uri.c_str());
+      port_string = "0";
+      index_port = std::string::npos; // set this for host extraction below
+    }
+    else
+    {
+      port_string = uri.substr(index_port+1, std::string::npos);
+    }
+    *port = stoi(port_string);
+    
+    // get host
+    host = uri.substr(index, index_port - index);
+  }
+  return RT_OK;
+}
+
+bool
+rtRemoteSameEndpoint(sockaddr_storage const& first, sockaddr_storage const& second)
+{
+  if (first.ss_family != second.ss_family)
+    return false;
+
+  if (first.ss_family == AF_INET)
   {
-    // local socket
-    std::string path = uri.substr(index, std::string::npos);
-    endpoint_addr = new rtRemoteLocalAddress(scheme, path);
+    sockaddr_in const* in1 = reinterpret_cast<sockaddr_in const*>(&first);
+    sockaddr_in const* in2 = reinterpret_cast<sockaddr_in const*>(&second);
+
+    if (in1->sin_port != in2->sin_port)
+      return false;
+
+    return in1->sin_addr.s_addr == in2->sin_addr.s_addr;
+  }
+
+  if (first.ss_family == AF_UNIX)
+  {
+    sockaddr_un const* un1 = reinterpret_cast<sockaddr_un const*>(&first);
+    sockaddr_un const* un2 = reinterpret_cast<sockaddr_un const*>(&second);
+
+    return 0 == strncmp(un1->sun_path, un2->sun_path, UNIX_PATH_MAX);
+  }
+
+  RT_ASSERT(false);
+  return false;
+}
+
+bool
+rtRemoteSameEndpoint(rtRemoteEndpointPtr const& first, rtRemoteEndpointPtr const& second)
+{
+  if (auto firstLocal = dynamic_pointer_cast<rtRemoteEndpointLocal>(first))
+  {
+    if (auto secondLocal = dynamic_pointer_cast<rtRemoteEndpointLocal>(second))
+      return *firstLocal == *secondLocal;
+    else
+      return false;
+  }
+  else if (auto firstRemote = dynamic_pointer_cast<rtRemoteEndpointRemote>(first))
+  {
+    if (auto secondRemote = dynamic_pointer_cast<rtRemoteEndpointRemote>(second))
+      return *firstRemote == *secondRemote;
+    else
+      return false;
   }
   else
   {
-    // network socket
-    std::string port_string;
-    size_t index_port = uri.find_last_of(":");
-    port_string = uri.substr(index_port+1, std::string::npos);
-    int port = stoi(port_string);
-    // TODO should check to make sure previous char wasn't also a colon
-    // as well as if any result came back at all
-
-    std::string host;
-    host = uri.substr(index, index_port - index);
-
-    NetType net_type;
-    rtRemoteParseNetType(host, net_type);
-    CastType cast_type;
-    rtRemoteParseCastType(host, net_type, cast_type);
-
-    endpoint_addr = new rtRemoteNetAddress(scheme, host, port, net_type, cast_type);   
+    RT_ASSERT(false);
+    return false;
   }
+}
+
+rtNetType
+rtRemoteParseNetType(std::string const& host)
+{
+  int ret;
+  struct addrinfo hint, *res = NULL;
+  memset(&hint, 0, sizeof hint);
+  
+  hint.ai_family = AF_UNSPEC;
+  hint.ai_flags = AI_NUMERICHOST;
+
+  ret = getaddrinfo(host.c_str(), NULL, &hint, &res);
+  if (ret)
+  {
+    freeaddrinfo(res);
+    rtLogWarn("unable to determine NetType (network layer protocol) for host: %s", host.c_str());
+    return rtNetType::NONE;
+  }
+  else
+  {
+    if (res->ai_family == AF_INET)
+      return rtNetType::IPV4;
+    else if (res->ai_family == AF_INET6)
+      return rtNetType::IPV6;
+    else
+    {
+      freeaddrinfo(res);
+      rtLogWarn("unable to determine NetType (network layer protocol) for host: %s", host.c_str());
+      return rtNetType::NONE;
+    }
+  }
+}
+
+rtCastType
+rtRemoteParseCastType(std::string const& host)
+{
+  std::string prefix;
+  rtNetType net_type = rtRemoteParseNetType(host);
+  if (net_type == rtNetType::IPV4)
+  {
+    prefix = host.substr(0, host.find('.'));
+    if (stoi(prefix) >= 224 && stoi(prefix) <= 239)
+      return rtCastType::MULTICAST;
+    else
+      return rtCastType::UNICAST;
+  }
+  else if (net_type == rtNetType::IPV6)
+  {
+    prefix = host.substr(0, 2);
+    if (prefix.compare("FF") == 0)
+      return rtCastType::MULTICAST;
+    else
+      return rtCastType::UNICAST;
+  }
+  else
+  {
+    return rtCastType::NONE;
+  }       
+}
+
+rtError
+rtRemoteEndpointToDocument(rtRemoteEndpointPtr& endpoint, rtJsonDocPtr& doc)
+{
+  if (auto remote_endpoint = dynamic_pointer_cast<rtRemoteEndpointRemote>(endpoint))
+  {
+    doc->AddMember(kFieldNameEndpointType, kEndpointTypeRemote, doc->GetAllocator());
+    doc->AddMember(kFieldNameScheme, remote_endpoint->scheme(), doc->GetAllocator());
+    doc->AddMember(kFieldNameIp, remote_endpoint->host(), doc->GetAllocator());
+    doc->AddMember(kFieldNamePort, remote_endpoint->port(), doc->GetAllocator());
+    return RT_OK;
+  }
+  else if (auto local_endpoint = dynamic_pointer_cast<rtRemoteEndpointLocal>(endpoint))
+  {
+    doc->AddMember(kFieldNameEndpointType, kEndpointTypeLocal, doc->GetAllocator());
+    doc->AddMember(kFieldNameScheme, local_endpoint->scheme(), doc->GetAllocator());
+    doc->AddMember(kFieldNamePath, local_endpoint->path(), doc->GetAllocator());
+    return RT_OK;
+  }
+  else
+  {
+    return RT_FAIL;
+  }
+  return RT_OK;
+}
+
+rtError
+rtRemoteDocumentToEndpoint(rtJsonDocPtr const& doc, rtRemoteEndpointPtr& endpoint)
+{
+  RT_ASSERT(doc->HasMember(kFieldNameScheme));
+  RT_ASSERT(doc->HasMember(kFieldNameEndpointType));
+  std::string type, scheme;
+  type   = (*doc)[kFieldNameEndpointType].GetString();
+  scheme = (*doc)[kFieldNameScheme].GetString();
+  
+  if (type.compare(kEndpointTypeLocal) == 0)
+  {
+    RT_ASSERT(doc->HasMember(kFieldNamePath));
+    std::string path;
+    path = (*doc)[kFieldNamePath].GetString();
+    // create and return local endpoint address
+    endpoint = std::make_shared<rtRemoteEndpointLocal>(scheme, path);
+    return RT_OK;
+  }
+  else if (type.compare(kEndpointTypeRemote) == 0)
+  {
+    RT_ASSERT(doc->HasMember(kFieldNameIp));
+    RT_ASSERT(doc->HasMember(kFieldNamePort));
+    std::string host;
+    uint16_t port;
+    host = (*doc)[kFieldNameIp].GetString();
+    port = (*doc)[kFieldNamePort].GetInt();
+    // create and return net endpoint address
+    endpoint = std::make_shared<rtRemoteEndpointRemote>(scheme, host, port);
+    return RT_OK;
+  }
+  else
+  {
+    rtLogError("unknown endpoint type: %s", type.c_str());
+    return RT_ERROR;
+  }
+  return RT_OK;  
+}
+
+rtError
+rtRemoteCombineDocuments(rtJsonDocPtr& target, rtJsonDocPtr& source)
+{
+  RT_ASSERT(target->IsObject());
+  RT_ASSERT(source->IsObject());
+  for (rapidjson::Value::MemberIterator itr = source->MemberBegin(); itr != source->MemberEnd(); ++itr)
+        target->AddMember(itr->name, itr->value, target->GetAllocator());
   return RT_OK;
 }

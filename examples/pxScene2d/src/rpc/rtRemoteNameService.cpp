@@ -2,10 +2,14 @@
 #include "rtSocketUtils.h"
 #include "rtRemoteMessage.h"
 #include "rtRemoteConfig.h"
+#include "rtRemoteTypes.h"
+#include "rtRemoteEndpoint.h"
+#include "rtRemoteUtils.h"
 
 #include <condition_variable>
 #include <thread>
 #include <mutex>
+#include <memory>
 
 #include <rtLog.h>
 
@@ -37,6 +41,7 @@ rtRemoteNameService::rtRemoteNameService(rtRemoteEnvPtr env)
   , m_pid(getpid())
   , m_command_handlers()
   , m_env(env)
+  , m_file_resolver(nullptr)
 {
   memset(&m_ns_endpoint, 0, sizeof(m_ns_endpoint));
 
@@ -68,7 +73,7 @@ rtRemoteNameService::init()
 {
   rtError err = RT_OK;
 
-  // TODO eventually, use a db rather than map.  Open it here.
+  m_file_resolver = new rtRemoteLocalResolver(m_env);
 
   // get socket info ready
   uint16_t const nsport = m_env->Config->resolver_unicast_port();
@@ -96,6 +101,11 @@ rtRemoteNameService::init()
 rtError
 rtRemoteNameService::close()
 {
+  if (m_file_resolver)
+  {
+    m_file_resolver->close();
+    delete m_file_resolver;
+  }
   if (m_shutdown_pipe[1] != -1)
   {
     char buff[] = {"shutdown"};
@@ -180,21 +190,19 @@ rtRemoteNameService::openNsSocket()
 rtError
 rtRemoteNameService::onRegister(rtJsonDocPtr const& doc, sockaddr_storage const& /*soc*/)
 {
-  RT_ASSERT(doc->HasMember(kFieldNameIp));
-  RT_ASSERT(doc->HasMember(kFieldNamePort));
-  
-  sockaddr_storage endpoint;
-  rtError err = rtParseAddress(endpoint, (*doc)[kFieldNameIp].GetString(),
-                (*doc)[kFieldNamePort].GetInt(), nullptr);
+  rtRemoteEndpointPtr objectEndpoint;
 
-  if (err != RT_OK)
-    return err;
-  
+  rtRemoteDocumentToEndpoint(doc, objectEndpoint);
   char const* objectId = rtMessage_GetObjectId(*doc);
   
   std::unique_lock<std::mutex> lock(m_mutex);
-  m_registered_objects[objectId] = endpoint;
+  m_registered_objects[objectId] = objectEndpoint;
   lock.unlock();
+
+  m_file_resolver->open();
+  m_file_resolver->registerObject(objectId, objectEndpoint);
+  m_file_resolver->close();
+
   return RT_OK;
 }
 
@@ -202,9 +210,14 @@ rtRemoteNameService::onRegister(rtJsonDocPtr const& doc, sockaddr_storage const&
  * Callback for deregistering objects
  */
 rtError
-rtRemoteNameService::onDeregister(rtJsonDocPtr const& /*doc*/, sockaddr_storage const& /*soc*/)
+rtRemoteNameService::onDeregister(rtJsonDocPtr const& doc, sockaddr_storage const& /*soc*/)
 {
-  // TODO
+  char const* objectId = rtMessage_GetObjectId(*doc);
+
+  m_file_resolver->open();
+  m_file_resolver->deregisterObject(objectId);
+  m_file_resolver->close();
+
   return RT_OK;
 }
 
@@ -228,42 +241,37 @@ rtRemoteNameService::onLookup(rtJsonDocPtr const& doc, sockaddr_storage const& s
   auto itr = m_registered_objects.end();
 
   char const* objectId = rtMessage_GetObjectId(*doc);
+  rtCorrelationKey seqId = rtMessage_GetNextCorrelationKey();
 
   std::unique_lock<std::mutex> lock(m_mutex);
   itr = m_registered_objects.find(objectId);
   lock.unlock();
 
-  if (itr != m_registered_objects.end())
+  rtRemoteEndpointPtr objectEndpoint;
+  m_file_resolver->open();
+  m_file_resolver->locateObject(objectId, objectEndpoint, 0);
+  m_file_resolver->close();
+
+  if (objectEndpoint)
   { // object is registered
 
-    // get IP and port
-    sockaddr_storage endpoint = itr->second;
-    std::string       ep_addr;
-    uint16_t          ep_port;
-    char buff[128];
-
-    void* addr = nullptr;
-    rtGetInetAddr(endpoint, &addr);
-
-    socklen_t len;
-    rtSocketGetLength(endpoint, &len);
-    char const* p = inet_ntop(endpoint.ss_family, addr, buff, len);
-    if (p)
-      ep_addr = p;
-    rtGetPort(endpoint, &ep_port);
-
     // create and send response
-    rapidjson::Document doc;
-    doc.SetObject();
-    doc.AddMember(kFieldNameMessageType, kNsMessageTypeLookupResponse, doc.GetAllocator());
-    doc.AddMember(kFieldNameStatusMessage, kNsStatusSuccess, doc.GetAllocator());
-    doc.AddMember(kFieldNameObjectId, std::string(objectId), doc.GetAllocator());
-    doc.AddMember(kFieldNameIp, ep_addr, doc.GetAllocator());
-    doc.AddMember(kFieldNamePort, ep_port, doc.GetAllocator());
-    doc.AddMember(kFieldNameSenderId, senderId->value.GetInt(), doc.GetAllocator());
-    doc.AddMember(kFieldNameCorrelationKey, key, doc.GetAllocator());
+    rtJsonDocPtr doc(new rapidjson::Document());
+    doc->SetObject();
+    doc->AddMember(kFieldNameMessageType, kNsMessageTypeLookupResponse, doc->GetAllocator());
+    doc->AddMember(kFieldNameStatusMessage, kNsStatusSuccess, doc->GetAllocator());
+    doc->AddMember(kFieldNameObjectId, std::string(objectId), doc->GetAllocator());
+    doc->AddMember(kFieldNameSenderId, m_pid, doc->GetAllocator());
+    doc->AddMember(kFieldNameCorrelationKey, seqId, doc->GetAllocator());
+    
+    rtJsonDocPtr endpoint_doc(new rapidjson::Document());
+    endpoint_doc->SetObject();
+    rtRemoteEndpointToDocument(objectEndpoint, endpoint_doc);
+    rtRemoteCombineDocuments(doc, endpoint_doc);
 
-    return rtSendDocument(doc, m_ns_fd, &soc);
+    rtLogInfo("\n\nNAMESERVICE: reporting location as %s\n\n", objectEndpoint->toUriString().c_str());
+
+    return rtSendDocument(*doc, m_ns_fd, &soc);
   }
   return RT_OK;
 }
@@ -311,7 +319,6 @@ rtRemoteNameService::runListener()
 void
 rtRemoteNameService::doRead(int fd, rtSocketBuffer& buff)
 {
-  rtLogInfo("doing read");
   // we only suppor v4 right now. not sure how recvfrom supports v6 and v4
   sockaddr_storage src;
   socklen_t len = sizeof(sockaddr_in);
@@ -347,9 +354,6 @@ rtRemoteNameService::doDispatch(char const* buff, int n, sockaddr_storage* peer)
     rtLogWarn("no command handler registered for: %s", message_type);
     return;
   }
-
-  // https://isocpp.org/wiki/faq/pointers-to-members#macro-for-ptr-to-memfn
-  #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
 
   err = CALL_MEMBER_FN(*this, itr->second)(doc, *peer);
   if (err != RT_OK)

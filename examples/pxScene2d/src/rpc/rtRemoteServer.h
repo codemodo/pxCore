@@ -28,6 +28,7 @@ public:
 public:
   rtError open();
   rtError registerObject(std::string const& name, rtObjectRef const& obj);
+  rtError deregisterObject(std::string const& name);
   rtError findObject(std::string const& name, rtObjectRef& obj, uint32_t timeout);
   rtError removeStaleObjects();
   rtError processMessage(std::shared_ptr<rtRemoteClient>& client, rtJsonDocPtr const& msg);
@@ -52,6 +53,7 @@ private:
   rtError onMethodCall(std::shared_ptr<rtRemoteClient>& client, rtJsonDocPtr const& doc);
   rtError onKeepAlive(std::shared_ptr<rtRemoteClient>& client, rtJsonDocPtr const& doc);
   rtError openRpcListener();
+  rtError parseConfig(sockaddr_storage& result);
 
 private:
   struct ObjectReference
@@ -67,14 +69,14 @@ private:
   using CommandHandlerMap = std::map< std::string, rtRemoteMessageHandler >;
   using ObjectRefeMap = std::map< std::string, ObjectReference >;
 
-  rtRemoteIAddress*             m_rpc_endpoint;
-  rtRemoteStreamServerEndpoint* m_srv_endpoint;
+  rtRemoteEndpointPtr           m_endpoint;
+  rtRemoteStreamServerEndpoint* m_endpoint_server;
 
   std::unique_ptr<std::thread>  m_thread;
   mutable std::mutex            m_mutex;
   CommandHandlerMap             m_command_handlers;
 
-  rtRemoteIResolver*            m_resolver;
+  rtRemoteResolverPtr           m_resolver;
   ClientMap                     m_object_map;
   ClientList                    m_connected_clients;
   int                           m_shutdown_pipe[2];

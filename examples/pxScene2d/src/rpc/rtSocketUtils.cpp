@@ -18,6 +18,9 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
+#include "rtRemoteEndpoint.h"
+#include "rtRemoteTypes.h"
+
 #ifndef RT_REMOTE_LOOPBACK_ONLY
 static rtError
 rtFindFirstInetInterface(char* name, size_t len)
@@ -321,6 +324,9 @@ rtSendDocument(rapidjson::Document const& doc, int fd, sockaddr_storage const* d
   rapidjson::Writer<rapidjson::StringBuffer> writer(buff);
   doc.Accept(writer);
 
+  // TODO Fiuk delete
+  // sockaddr_storage remote_endpoint;
+  // memset(&remote_endpoint, 0, sizeof(sockaddr_storage));
   #ifdef RT_RPC_DEBUG
   sockaddr_storage remote_endpoint;
   memset(&remote_endpoint, 0, sizeof(sockaddr_storage));
@@ -338,9 +344,9 @@ rtSendDocument(rapidjson::Document const& doc, int fd, sockaddr_storage const* d
     static_cast<int>(buff.GetSize()),
     buff.GetString());
   #endif
-
+ 
   if (dest)
-  {
+  { 
     socklen_t len;
     rtSocketGetLength(*dest, &len);
 
@@ -360,6 +366,7 @@ rtSendDocument(rapidjson::Document const& doc, int fd, sockaddr_storage const* d
   }
   else
   {
+
     // send length first
     int n = buff.GetSize();
     n = htonl(n);
