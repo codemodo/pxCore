@@ -68,5 +68,5 @@ private:
   int		            m_shutdown_pipe[2];
   rtRemoteEnvPtr    m_env;
 
-  rtRemoteEndpointMapperSimple m_endpoint_mapper;
+  rtRemoteIEndpointMapper* m_endpoint_mapper;
 };

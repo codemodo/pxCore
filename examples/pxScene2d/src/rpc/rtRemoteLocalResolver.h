@@ -3,6 +3,7 @@
 
 #include <string>
 #include <stdint.h>
+#include "rtRemoteEndpointMapper.h"
 
 class rtRemoteLocalResolver : public rtRemoteIResolver
 {
@@ -19,6 +20,6 @@ public:
   virtual rtError deregisterObject(std::string const& name) override;
 
 private:
-  FILE*          m_db_fp;
   rtRemoteEnvPtr m_env;
+  rtRemoteIEndpointMapper* m_endpoint_mapper;
 };

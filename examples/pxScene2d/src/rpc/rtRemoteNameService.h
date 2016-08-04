@@ -12,6 +12,7 @@
 #include "rtRemoteTypes.h"
 #include "rtSocketUtils.h"
 #include "rtRemoteLocalResolver.h"
+#include "rtRemoteEndpointMapper.h"
 
 class rtRemoteNameService
 {
@@ -37,22 +38,20 @@ private:
   void runListener();
   void doRead(int fd, rtSocketBuffer& buff);
   void doDispatch(char const* buff, int n, sockaddr_storage* peer);
-  // rtError openDbConnection();
-  rtError openNsSocket();
+  rtError openSocket();
 
 private:
-  sockaddr_storage  m_ns_endpoint;
-  int               m_ns_fd;
-  socklen_t         m_ns_len;
+  sockaddr_storage  m_sock_addr;
+  int               m_sock_fd;
+  socklen_t         m_sock_len;
   
-  pid_t                        m_pid;
+  pid_t                m_pid;
   CommandHandlerMap    m_command_handlers;
   RequestMap           m_pending_requests;
-  RegisteredObjectsMap m_registered_objects;
 
   std::mutex                   m_mutex;
   std::unique_ptr<std::thread> m_read_thread;
   int		                       m_shutdown_pipe[2];
   rtRemoteEnvPtr               m_env;
-  rtRemoteLocalResolver*       m_file_resolver;
+  rtRemoteIEndpointMapper*     m_endpoint_mapper;
 };

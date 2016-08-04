@@ -15,10 +15,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-
+//TODO
+// cleanup resolver method stubs
 rtRemoteLocalResolver::rtRemoteLocalResolver(rtRemoteEnvPtr env)
-: m_db_fp(nullptr)
-, m_env(env)
+: m_env(env)
+, m_endpoint_mapper(nullptr)
 {
   // empty
 }
@@ -33,190 +34,34 @@ rtRemoteLocalResolver::~rtRemoteLocalResolver()
 rtError
 rtRemoteLocalResolver::open()
 {
-  std::string dbPath = m_env->Config->resolver_file_db_path();
-  m_db_fp = fopen(dbPath.c_str(), "r");
-  if (m_db_fp == nullptr)
-  {
-    rtError e = rtErrorFromErrno(errno);
-    rtLogError("could not open database file %s. %s", dbPath.c_str(), rtStrError(e));
-    return e;
-  }
+  //try catch TODO
+  m_endpoint_mapper = new rtRemoteEndpointMapperFile(m_env);
   return RT_OK;
 }
 
 rtError
 rtRemoteLocalResolver::registerObject(std::string const& name, rtRemoteEndpointPtr endpoint)
 {
-  if (m_db_fp == nullptr)
-  {
-    rtLogError("no database connection");
-    return RT_ERROR_INVALID_ARG;
-  }
-
-  // tmp file to write to while reading/checking contents of permanent file. renamed later.
-  std::string path, tmp_path;
-  path = m_env->Config->resolver_file_db_path();
-  tmp_path = path + ".tmp";
-  
-  char *line = NULL;
-  size_t len = 0;
-  int read = -1;
-
-  // lock it down
-  flock(fileno(m_db_fp), LOCK_EX);
-  
-  fseek(m_db_fp, 0, SEEK_SET);
-  while ( access( tmp_path.c_str(), F_OK ) != -1 );
-  FILE *tmp_fp = fopen(tmp_path.c_str(),"w");
-
-  // read line by line
-  while ( (read = getline(&line, &len, m_db_fp)) != -1)
-  {
-    if (line[read-1] == '\n')
-      line[read-1] = '\0';
-    std::string line_string(line);
-    size_t index = line_string.find("::=");
-    if (index != std::string::npos)
-    {
-      std::string objId = line_string.substr(0, index);
-      // if not the one we want to register, just copy record over
-      if (name.compare(objId) != 0)
-      {
-        fprintf(tmp_fp, "%s\n", line);
-      }
-      // else overwrite it
-      else
-      {
-        rtLogWarn("overwriting existing registered endpoint: %s", line);
-      }
-    }
-  }
-  std::string result = name + "::=" + endpoint->toUriString();
-  fprintf(tmp_fp, "%s\n", result.c_str());
-  fclose(tmp_fp);
-  fflush(m_db_fp);
-  
-  if (rename(tmp_path.c_str(), path.c_str()))
-  {
-    rtLogError("failed to save file");
-    return RT_FAIL;
-  }
-
-  flock(fileno(m_db_fp), LOCK_UN);
-
-  return RT_OK;
+  return m_endpoint_mapper->registerEndpoint(name, endpoint);
 }
 
 rtError
 rtRemoteLocalResolver::deregisterObject(std::string const& name)
 {
-  rtError err = RT_FAIL;
-  if (m_db_fp == nullptr)
-  {
-    rtLogError("no database connection");
-    return RT_ERROR_INVALID_ARG;
-  }
-
-  // tmp file to write to while reading/checking contents of permanent file. renamed later.
-  std::string path, tmp_path;
-  path = m_env->Config->resolver_file_db_path();
-  tmp_path = path + ".tmp";
-  
-  char *line = NULL;
-  size_t len = 0;
-  int read = -1;
-
-  // lock it down
-  flock(fileno(m_db_fp), LOCK_EX);
-  
-  fseek(m_db_fp, 0, SEEK_SET);
-  while ( access( tmp_path.c_str(), F_OK ) != -1 );
-  FILE *tmp_fp = fopen(tmp_path.c_str(),"w");
-
-  // read line by line
-  while ( (read = getline(&line, &len, m_db_fp)) != -1)
-  {
-    if (line[read-1] == '\n')
-      line[read-1] = '\0';
-    std::string line_string(line);
-    size_t index = line_string.find("::=");
-    if (index != std::string::npos)
-    {
-      std::string objId = line_string.substr(0, index);
-      // copy over everything except for the one to be deregistered
-      if (name.compare(objId) != 0)
-      {
-        fprintf(tmp_fp, "%s\n", line);
-      }
-      else
-      {
-        rtLogInfo("deleting record for %s", objId.c_str());
-        err = RT_OK;
-      }
-    }
-  }
-  fclose(tmp_fp);
-  fflush(m_db_fp);
-  
-  if (rename(tmp_path.c_str(), path.c_str()))
-  {
-    rtLogError("failed to save file");
-    return RT_FAIL;
-  }
-    
-  flock(fileno(m_db_fp), LOCK_UN);
-
-  return err;
+  return m_endpoint_mapper->deregisterEndpoint(name);
 }
 
 rtError
 rtRemoteLocalResolver::locateObject(std::string const& name, rtRemoteEndpointPtr& endpoint,
     uint32_t /*timeout*/)
 {
-  if (m_db_fp == nullptr)
-  {
-    rtLogError("no database connection");
-    return RT_ERROR_INVALID_ARG;
-  }
-
-  std::string result;
-  char *line = NULL;
-  size_t len = 0;
-  int read = -1;
-
-  // lock it down
-  flock(fileno(m_db_fp), LOCK_EX);
-  
-  fseek(m_db_fp, 0, SEEK_SET);
-
-  // read line by line
-  while ( (read = getline(&line, &len, m_db_fp)) != -1)
-  {
-    if (line[read-1] == '\n')
-      line[read-1] = '\0';
-    std::string line_string(line);
-    size_t index = line_string.find("::=");
-    if (index != std::string::npos)
-    {
-      std::string objId = line_string.substr(0, index);
-      if (name.compare(objId) == 0)
-        result = line_string.substr(index+3, std::string::npos);
-    }
-  }
-  fflush(m_db_fp);
-  flock(fileno(m_db_fp), LOCK_UN);
-  
-  // result contains endpoint's URI (if registered)
-  if (!result.empty())
-    return m_env->Factory->createEndpoint(result, endpoint);
-  else
-    return RT_FAIL;
+  return m_endpoint_mapper->lookupEndpoint(name, endpoint);
 }
 
 rtError
 rtRemoteLocalResolver::close()
 {
-  if (m_db_fp != nullptr)
-    fclose(m_db_fp);
+  if (m_endpoint_mapper)
+    delete m_endpoint_mapper;
   return RT_OK;
 }

@@ -5,6 +5,7 @@
 #include "rtRemoteTypes.h"
 #include "rtRemoteUtils.h"
 #include "rtRemoteEndpoint.h"
+#include "rtRemoteEndpointMapper.h"
 
 #include <memory>
 #include <condition_variable>
@@ -40,7 +41,7 @@ rtRemoteMulticastResolver::rtRemoteMulticastResolver(rtRemoteEnvPtr env)
   , m_pid(getpid())
   , m_command_handlers()
   , m_env(env)
-  , m_endpoint_mapper(env)
+  , m_endpoint_mapper(nullptr)
 {
   memset(&m_mcast_dest, 0, sizeof(m_mcast_dest));
   memset(&m_mcast_src, 0, sizeof(m_mcast_src));
@@ -70,6 +71,7 @@ rtRemoteMulticastResolver::~rtRemoteMulticastResolver()
 rtError
 rtRemoteMulticastResolver::init()
 {
+  m_endpoint_mapper = new rtRemoteEndpointMapperSimple(m_env);
   rtError err = RT_OK;
 
   uint16_t const port = m_env->Config->resolver_multicast_port();
@@ -300,7 +302,7 @@ rtRemoteMulticastResolver::onSearch(rtJsonDocPtr const& doc, sockaddr_storage co
   char const* objectId = rtMessage_GetObjectId(*doc);
 
   rtRemoteEndpointPtr objectEndpoint;
-  m_endpoint_mapper.locate(objectId, objectEndpoint);
+  m_endpoint_mapper->lookupEndpoint(objectId, objectEndpoint);
 
   if (objectEndpoint)
   {
@@ -488,6 +490,9 @@ rtRemoteMulticastResolver::doDispatch(char const* buff, int n, sockaddr_storage*
 rtError
 rtRemoteMulticastResolver::close()
 {
+  if (m_endpoint_mapper)
+    delete m_endpoint_mapper;
+
   if (m_shutdown_pipe[1] != -1)
   {
     char buff[] = {"shutdown"};
@@ -526,13 +531,11 @@ rtRemoteMulticastResolver::close()
 rtError
 rtRemoteMulticastResolver::registerObject(std::string const& name, rtRemoteEndpointPtr endpoint)
 {
-  m_endpoint_mapper.registers(name, endpoint);
-  return RT_OK;
+  return m_endpoint_mapper->registerEndpoint(name, endpoint);
 }
 
 rtError
 rtRemoteMulticastResolver::deregisterObject(std::string const& name)
 {
-  // TODO
-  return RT_OK;
+  return m_endpoint_mapper->deregisterEndpoint(name);
 }

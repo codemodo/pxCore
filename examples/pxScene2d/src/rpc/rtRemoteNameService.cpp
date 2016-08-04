@@ -5,6 +5,7 @@
 #include "rtRemoteTypes.h"
 #include "rtRemoteEndpoint.h"
 #include "rtRemoteUtils.h"
+#include "rtRemoteEndpointMapper.h"
 
 #include <condition_variable>
 #include <thread>
@@ -36,14 +37,14 @@
 #include <rapidjson/pointer.h>
 
 rtRemoteNameService::rtRemoteNameService(rtRemoteEnvPtr env)
-  : m_ns_fd(-1)
-  , m_ns_len(0)
+  : m_sock_fd(-1)
+  , m_sock_len(0)
   , m_pid(getpid())
   , m_command_handlers()
   , m_env(env)
-  , m_file_resolver(nullptr)
+  , m_endpoint_mapper(nullptr)
 {
-  memset(&m_ns_endpoint, 0, sizeof(m_ns_endpoint));
+  memset(&m_sock_addr, 0, sizeof(m_sock_addr));
 
   m_command_handlers.insert(CommandHandlerMap::value_type(kNsMessageTypeRegister, &rtRemoteNameService::onRegister));
   m_command_handlers.insert(CommandHandlerMap::value_type(kNsMessageTypeDeregister, &rtRemoteNameService::onDeregister));
@@ -73,21 +74,21 @@ rtRemoteNameService::init()
 {
   rtError err = RT_OK;
 
-  m_file_resolver = new rtRemoteLocalResolver(m_env);
+  m_endpoint_mapper = new rtRemoteEndpointMapperFile(m_env);
 
   // get socket info ready
   uint16_t const nsport = m_env->Config->resolver_unicast_port();
   std::string nsaddr = m_env->Config->resolver_unicast_address();
-  err = rtParseAddress(m_ns_endpoint, nsaddr.c_str(), nsport, nullptr);
+  err = rtParseAddress(m_sock_addr, nsaddr.c_str(), nsport, nullptr);
   if (err != RT_OK)
   {
-    err = rtGetDefaultInterface(m_ns_endpoint, 0);
+    err = rtGetDefaultInterface(m_sock_addr, 0);
     if (err != RT_OK)
       return err;
   }
 
   // open unicast socket
-  err = openNsSocket();
+  err = openSocket();
   if (err != RT_OK)
   {
       rtLogWarn("failed to open name service unicast socket. %s", rtStrError(err));
@@ -101,11 +102,9 @@ rtRemoteNameService::init()
 rtError
 rtRemoteNameService::close()
 {
-  if (m_file_resolver)
-  {
-    m_file_resolver->close();
-    delete m_file_resolver;
-  }
+  if (m_endpoint_mapper)
+    delete m_endpoint_mapper;
+
   if (m_shutdown_pipe[1] != -1)
   {
     char buff[] = {"shutdown"};
@@ -128,38 +127,35 @@ rtRemoteNameService::close()
       ::close(m_shutdown_pipe[1]);
   }
 
-  if (m_ns_fd != -1)
-    ::close(m_ns_fd);
+  if (m_sock_fd != -1)
+    ::close(m_sock_fd);
 
-  m_ns_fd = -1;
+  m_sock_fd = -1;
   m_shutdown_pipe[0] = -1;
   m_shutdown_pipe[1] = -1;
 
   return RT_OK;
 }
 
-// rtError 
-// rtRemoteNameService::openDbConnection(){}
-
 rtError
-rtRemoteNameService::openNsSocket()
+rtRemoteNameService::openSocket()
 {
   int ret = 0;
 
-  m_ns_fd = socket(m_ns_endpoint.ss_family, SOCK_DGRAM, 0);
-  if (m_ns_fd < 0)
+  m_sock_fd = socket(m_sock_addr.ss_family, SOCK_DGRAM, 0);
+  if (m_sock_fd < 0)
   {
     rtError e = rtErrorFromErrno(errno);
     rtLogError("failed to create unicast socket with family: %d. %s", 
-      m_ns_endpoint.ss_family, rtStrError(e));
+      m_sock_addr.ss_family, rtStrError(e));
     return e;
   }
-  fcntl(m_ns_fd, F_SETFD, fcntl(m_ns_fd, F_GETFD) | FD_CLOEXEC);
+  fcntl(m_sock_fd, F_SETFD, fcntl(m_sock_fd, F_GETFD) | FD_CLOEXEC);
 
-  rtSocketGetLength(m_ns_endpoint, &m_ns_len);
+  rtSocketGetLength(m_sock_addr, &m_sock_len);
 
   // listen on ANY port
-  ret = bind(m_ns_fd, reinterpret_cast<sockaddr *>(&m_ns_endpoint), m_ns_len);
+  ret = bind(m_sock_fd, reinterpret_cast<sockaddr *>(&m_sock_addr), m_sock_len);
   if (ret < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -168,8 +164,8 @@ rtRemoteNameService::openNsSocket()
   }
 
   // now figure out which port we're bound to
-  rtSocketGetLength(m_ns_endpoint, &m_ns_len);
-  ret = getsockname(m_ns_fd, reinterpret_cast<sockaddr *>(&m_ns_endpoint), &m_ns_len);
+  rtSocketGetLength(m_sock_addr, &m_sock_len);
+  ret = getsockname(m_sock_fd, reinterpret_cast<sockaddr *>(&m_sock_addr), &m_sock_len);
   if (ret < 0)
   {
     rtError e = rtErrorFromErrno(errno);
@@ -178,7 +174,7 @@ rtRemoteNameService::openNsSocket()
   }
   else
   {
-    rtLogInfo("local udp socket bound to %s", rtSocketToString(m_ns_endpoint).c_str());
+    rtLogInfo("local udp socket bound to %s", rtSocketToString(m_sock_addr).c_str());
   }
 
   return RT_OK;
@@ -191,19 +187,10 @@ rtError
 rtRemoteNameService::onRegister(rtJsonDocPtr const& doc, sockaddr_storage const& /*soc*/)
 {
   rtRemoteEndpointPtr objectEndpoint;
-
   rtRemoteDocumentToEndpoint(doc, objectEndpoint);
   char const* objectId = rtMessage_GetObjectId(*doc);
   
-  std::unique_lock<std::mutex> lock(m_mutex);
-  m_registered_objects[objectId] = objectEndpoint;
-  lock.unlock();
-
-  m_file_resolver->open();
-  m_file_resolver->registerObject(objectId, objectEndpoint);
-  m_file_resolver->close();
-
-  return RT_OK;
+  return m_endpoint_mapper->registerEndpoint(objectId, objectEndpoint);
 }
 
 /**
@@ -214,11 +201,7 @@ rtRemoteNameService::onDeregister(rtJsonDocPtr const& doc, sockaddr_storage cons
 {
   char const* objectId = rtMessage_GetObjectId(*doc);
 
-  m_file_resolver->open();
-  m_file_resolver->deregisterObject(objectId);
-  m_file_resolver->close();
-
-  return RT_OK;
+  return m_endpoint_mapper->deregisterEndpoint(objectId);
 }
 
 rtError
@@ -237,20 +220,11 @@ rtRemoteNameService::onLookup(rtJsonDocPtr const& doc, sockaddr_storage const& s
     return RT_OK;
 
   int key = rtMessage_GetCorrelationKey(*doc);
-
-  auto itr = m_registered_objects.end();
-
-  char const* objectId = rtMessage_GetObjectId(*doc);
   rtCorrelationKey seqId = rtMessage_GetNextCorrelationKey();
 
-  std::unique_lock<std::mutex> lock(m_mutex);
-  itr = m_registered_objects.find(objectId);
-  lock.unlock();
-
+  char const* objectId = rtMessage_GetObjectId(*doc);
   rtRemoteEndpointPtr objectEndpoint;
-  m_file_resolver->open();
-  m_file_resolver->locateObject(objectId, objectEndpoint, 0);
-  m_file_resolver->close();
+  m_endpoint_mapper->lookupEndpoint(objectId, objectEndpoint);
 
   if (objectEndpoint)
   { // object is registered
@@ -271,7 +245,7 @@ rtRemoteNameService::onLookup(rtJsonDocPtr const& doc, sockaddr_storage const& s
 
     rtLogInfo("\n\nNAMESERVICE: reporting location as %s\n\n", objectEndpoint->toUriString().c_str());
 
-    return rtSendDocument(*doc, m_ns_fd, &soc);
+    return rtSendDocument(*doc, m_sock_fd, &soc);
   }
   return RT_OK;
 }
@@ -291,11 +265,11 @@ rtRemoteNameService::runListener()
     fd_set err_fds;
 
     FD_ZERO(&read_fds);
-    rtPushFd(&read_fds, m_ns_fd, &maxFd);
+    rtPushFd(&read_fds, m_sock_fd, &maxFd);
     rtPushFd(&read_fds, m_shutdown_pipe[0], &maxFd);
 
     FD_ZERO(&err_fds);
-    rtPushFd(&err_fds, m_ns_fd, &maxFd);
+    rtPushFd(&err_fds, m_sock_fd, &maxFd);
 
     int ret = select(maxFd + 1, &read_fds, NULL, &err_fds, NULL);
     if (ret == -1)
@@ -311,8 +285,8 @@ rtRemoteNameService::runListener()
       return;
     }
 
-    if (FD_ISSET(m_ns_fd, &read_fds))
-      doRead(m_ns_fd, buff);
+    if (FD_ISSET(m_sock_fd, &read_fds))
+      doRead(m_sock_fd, buff);
   }
 }
 

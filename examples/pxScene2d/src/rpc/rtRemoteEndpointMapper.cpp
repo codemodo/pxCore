@@ -16,16 +16,11 @@
 rtRemoteEndpointMapperSimple::rtRemoteEndpointMapperSimple(rtRemoteEnvPtr env)
 : rtRemoteIEndpointMapper(env)
 {
+  // empty
 }
 
 rtError
-rtRemoteEndpointMapperSimple::init()
-{
-  return RT_OK;
-}
-
-rtError
-rtRemoteEndpointMapperSimple::registers(std::string const& objectId, rtRemoteEndpointPtr const& endpoint)
+rtRemoteEndpointMapperSimple::registerEndpoint(std::string const& objectId, rtRemoteEndpointPtr const& endpoint)
 {
   std::unique_lock<std::mutex> lock(m_mutex);
   m_hosted_objects[objectId] = endpoint;
@@ -34,7 +29,7 @@ rtRemoteEndpointMapperSimple::registers(std::string const& objectId, rtRemoteEnd
 }
 
 rtError
-rtRemoteEndpointMapperSimple::deregister(std::string const& objectId)
+rtRemoteEndpointMapperSimple::deregisterEndpoint(std::string const& objectId)
 {
   std::unique_lock<std::mutex> lock(m_mutex);
   m_hosted_objects[objectId] = nullptr;
@@ -43,7 +38,7 @@ rtRemoteEndpointMapperSimple::deregister(std::string const& objectId)
 }
 
 rtError
-rtRemoteEndpointMapperSimple::locate(std::string const& objectId, rtRemoteEndpointPtr& endpoint)
+rtRemoteEndpointMapperSimple::lookupEndpoint(std::string const& objectId, rtRemoteEndpointPtr& endpoint)
 {
   auto itr = m_hosted_objects.end();
   std::unique_lock<std::mutex> lock(m_mutex);
@@ -76,28 +71,18 @@ rtRemoteEndpointMapperSimple::isRegistered(std::string const& objectId)
 rtRemoteEndpointMapperFile::rtRemoteEndpointMapperFile(rtRemoteEnvPtr env)
 : rtRemoteIEndpointMapper(env)
 {
-}
-
-rtError
-rtRemoteEndpointMapperFile::init()
-{
   std::string filePath = m_env->Config->resolver_file_db_path();
   m_fp = fopen(filePath.c_str(), "r");
   if (m_fp == nullptr)
-  {
-    rtError e = rtErrorFromErrno(errno);
-    rtLogError("could not open database file %s. %s", filePath.c_str(), rtStrError(e));
-    return e;
-  }
-  return RT_OK;
+    throw rtErrorFromErrno(errno);
 }
 
 rtError
-rtRemoteEndpointMapperFile::registers(std::string const& objectId, rtRemoteEndpointPtr const& endpoint)
+rtRemoteEndpointMapperFile::registerEndpoint(std::string const& objectId, rtRemoteEndpointPtr const& endpoint)
 {
   if (m_fp == nullptr)
   {
-    rtLogError("no database connection");
+    rtLogError("file not opened for registration");
     return RT_ERROR_INVALID_ARG;
   }
 
@@ -156,7 +141,7 @@ rtRemoteEndpointMapperFile::registers(std::string const& objectId, rtRemoteEndpo
 }
 
 rtError
-rtRemoteEndpointMapperFile::deregister(std::string const& objectId)
+rtRemoteEndpointMapperFile::deregisterEndpoint(std::string const& objectId)
 {
   rtError err = RT_OK;
   if (m_fp == nullptr)
@@ -218,7 +203,7 @@ rtRemoteEndpointMapperFile::deregister(std::string const& objectId)
 }
 
 rtError
-rtRemoteEndpointMapperFile::locate(std::string const& objectId, rtRemoteEndpointPtr& endpoint)
+rtRemoteEndpointMapperFile::lookupEndpoint(std::string const& objectId, rtRemoteEndpointPtr& endpoint)
 {
   if (m_fp == nullptr)
   {
