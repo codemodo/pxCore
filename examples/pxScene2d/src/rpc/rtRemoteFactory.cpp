@@ -1,11 +1,11 @@
 #include "rtRemoteFactory.h"
 #include "rtRemoteConfig.h"
 #include "rtRemoteIResolver.h"
-#include "rtRemoteFileResolver.h"
 #include "rtRemoteMulticastResolver.h"
 #include "rtRemoteUnicastResolver.h"
 #include "rtRemoteTypes.h"
 #include "rtRemoteUtils.h"
+#include "rtRemoteLocalResolver.h"
 #include <algorithm>
 
 static rtResolverType
@@ -65,7 +65,7 @@ rtError
 rtRemoteFactory::createResolver(rtRemoteResolverPtr& resolver)
 {
   rtResolverType t = rtResolverTypeFromString(m_env->Config->resolver_type());
-  t = rtResolverType::UNICAST;
+  t = rtResolverType::MULTICAST;
 
   switch (t)
   {
@@ -73,7 +73,7 @@ rtRemoteFactory::createResolver(rtRemoteResolverPtr& resolver)
       resolver = new rtRemoteMulticastResolver(m_env);
       break;
     case rtResolverType::FILE:
-      resolver = new rtRemoteFileResolver(m_env);
+      resolver = new rtRemoteLocalResolver(m_env);
       break;
     case rtResolverType::UNICAST:
       resolver = new rtRemoteUnicastResolver(m_env);

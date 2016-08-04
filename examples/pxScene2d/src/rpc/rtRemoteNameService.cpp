@@ -73,7 +73,7 @@ rtRemoteNameService::init()
 {
   rtError err = RT_OK;
 
-  m_file_resolver = new rtRemoteFileResolver(m_env);
+  m_file_resolver = new rtRemoteLocalResolver(m_env);
 
   // get socket info ready
   uint16_t const nsport = m_env->Config->resolver_unicast_port();
@@ -210,9 +210,14 @@ rtRemoteNameService::onRegister(rtJsonDocPtr const& doc, sockaddr_storage const&
  * Callback for deregistering objects
  */
 rtError
-rtRemoteNameService::onDeregister(rtJsonDocPtr const& /*doc*/, sockaddr_storage const& /*soc*/)
+rtRemoteNameService::onDeregister(rtJsonDocPtr const& doc, sockaddr_storage const& /*soc*/)
 {
-  // TODO
+  char const* objectId = rtMessage_GetObjectId(*doc);
+
+  m_file_resolver->open();
+  m_file_resolver->deregisterObject(objectId);
+  m_file_resolver->close();
+
   return RT_OK;
 }
 
@@ -314,7 +319,6 @@ rtRemoteNameService::runListener()
 void
 rtRemoteNameService::doRead(int fd, rtSocketBuffer& buff)
 {
-  rtLogInfo("doing read");
   // we only suppor v4 right now. not sure how recvfrom supports v6 and v4
   sockaddr_storage src;
   socklen_t len = sizeof(sockaddr_in);

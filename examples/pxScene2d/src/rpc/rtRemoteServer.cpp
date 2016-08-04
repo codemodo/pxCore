@@ -244,6 +244,13 @@ rtRemoteServer::registerObject(std::string const& name, rtObjectRef const& obj)
   return RT_OK;
 }
 
+rtError
+rtRemoteServer::deregisterObject(std::string const& name)
+{
+  m_resolver->deregisterObject(name);
+  return RT_OK;
+}
+
 void
 rtRemoteServer::runListener()
 {

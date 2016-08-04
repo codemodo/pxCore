@@ -11,7 +11,7 @@
 
 #include "rtRemoteTypes.h"
 #include "rtSocketUtils.h"
-#include "rtRemoteFileResolver.h"
+#include "rtRemoteLocalResolver.h"
 
 class rtRemoteNameService
 {
@@ -54,5 +54,5 @@ private:
   std::unique_ptr<std::thread> m_read_thread;
   int		                       m_shutdown_pipe[2];
   rtRemoteEnvPtr               m_env;
-  rtRemoteFileResolver*        m_file_resolver;
+  rtRemoteLocalResolver*       m_file_resolver;
 };

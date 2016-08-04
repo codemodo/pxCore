@@ -142,6 +142,18 @@ rtRemoteRegisterObject(rtRemoteEnvironment* env, char const* id, rtObjectRef con
 }
 
 rtError
+rtRemoteDeregisterObject(rtRemoteEnvironment* env, char const* id)
+{
+  if (env == nullptr)
+    return RT_FAIL;
+
+  if (id == nullptr)
+    return RT_ERROR_INVALID_ARG;
+
+  return env->Server->deregisterObject(id);
+}
+
+rtError
 rtRemoteLocateObject(rtRemoteEnvironment* env, char const* id, rtObjectRef& obj)
 {
   if (env == nullptr)

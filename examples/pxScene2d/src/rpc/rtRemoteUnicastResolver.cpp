@@ -165,6 +165,80 @@ rtRemoteUnicastResolver::registerObject(std::string const& name, rtRemoteEndpoin
 }
 
 rtError
+rtRemoteUnicastResolver::deregisterObject(std::string const& name)
+{
+  uint32_t timeout = 3000;
+  if (m_fd == -1)
+  {
+    rtLogError("unicast socket not opened");
+    return RT_FAIL;
+  }
+
+  rtError err = RT_OK;
+  rtCorrelationKey seqId = rtMessage_GetNextCorrelationKey();
+
+  rtJsonDocPtr doc(new rapidjson::Document());
+  doc->SetObject();
+  doc->AddMember(kFieldNameMessageType, kNsMessageTypeDeregister, doc->GetAllocator());
+  doc->AddMember(kFieldNameObjectId, name, doc->GetAllocator());
+  doc->AddMember(kFieldNameSenderId, m_pid, doc->GetAllocator());
+  doc->AddMember(kFieldNameCorrelationKey, seqId, doc->GetAllocator());
+
+  err = rtSendDocument(*doc, m_fd, &m_ns_dest);
+  if (err != RT_OK)
+    return err;
+
+  rtJsonDocPtr searchResponse;
+  RequestMap::const_iterator itr;
+
+  auto delay = std::chrono::system_clock::now() + std::chrono::milliseconds(timeout);
+
+  // wait here until timeout expires or we get a response that matches out pid/seqid
+  std::unique_lock<std::mutex> lock(m_mutex);
+  itr = m_pending_searches.end();
+  m_cond.wait_until(lock, delay, [this, seqId, &searchResponse]
+    {
+      auto itr = this->m_pending_searches.find(seqId);
+      if (itr != this->m_pending_searches.end())
+      {
+        searchResponse = itr->second;
+        this->m_pending_searches.erase(itr);
+      }
+      return searchResponse != nullptr;
+    });
+  lock.unlock();
+
+  if (!searchResponse)
+    return RT_FAIL;
+
+  // response is in itr
+  if (searchResponse)
+  {
+    char const* message_type = rtMessage_GetMessageType(*searchResponse);
+    
+    if (strcmp(message_type, kNsMessageTypeDeregisterResponse) == 0)
+    {    
+      if (strcmp(rtMessage_GetStatusMessage(*searchResponse), kNsStatusFail) == 0)
+      {
+        rtLogWarn("ns deregister failed");
+        return RT_FAIL;
+      }
+      else
+      {
+        return RT_OK;
+      }
+    }
+    else
+    {
+      rtLogWarn("unexpected response to lookup request. %s", message_type);
+      return RT_FAIL;
+    }
+  }
+
+  return RT_OK;
+}
+
+rtError
 rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteEndpointPtr& endpoint,
     uint32_t timeout)
 {
@@ -230,7 +304,6 @@ rtRemoteUnicastResolver::locateObject(std::string const& name, rtRemoteEndpointP
       else
       {
         err = rtRemoteDocumentToEndpoint(searchResponse, endpoint);
-        rtLogInfo("\n\nUNICASTRESOLVER: received location as %s\n\n", endpoint->toUriString().c_str());
         if (err != RT_OK)
           return err;
       }

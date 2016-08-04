@@ -296,16 +296,12 @@ rtRemoteMulticastResolver::onSearch(rtJsonDocPtr const& doc, sockaddr_storage co
   }
 
   int key = rtMessage_GetCorrelationKey(*doc);
-
-  auto itr = m_hosted_objects.end();
-
   char const* objectId = rtMessage_GetObjectId(*doc);
 
-  std::unique_lock<std::mutex> lock(m_mutex);
-  itr = m_hosted_objects.find(objectId);
-  lock.unlock();
+  rtRemoteEndpointPtr objectEndpoint;
+  m_endpoint_mapper.locate(objectId, objectEndpoint);
 
-  if (itr != m_hosted_objects.end())
+  if (objectEndpoint)
   {
     rtJsonDocPtr doc(new rapidjson::Document());
     doc->SetObject();
@@ -316,7 +312,7 @@ rtRemoteMulticastResolver::onSearch(rtJsonDocPtr const& doc, sockaddr_storage co
 
     rtJsonDocPtr endpoint_doc(new rapidjson::Document());
     endpoint_doc->SetObject();
-    rtRemoteEndpointToDocument(itr->second, endpoint_doc);
+    rtRemoteEndpointToDocument(objectEndpoint, endpoint_doc);
     rtRemoteCombineDocuments(doc, endpoint_doc);
 
     return rtSendDocument(*doc, m_ucast_fd, &soc);
@@ -529,10 +525,13 @@ rtRemoteMulticastResolver::close()
 rtError
 rtRemoteMulticastResolver::registerObject(std::string const& name, rtRemoteEndpointPtr endpoint)
 {
-  sockaddr_storage endpoint_sockaddr;
-  rtRemoteEndpointAddressToSocket(endpoint, endpoint_sockaddr);
-  std::unique_lock<std::mutex> lock(m_mutex);
-  m_hosted_objects[name] = endpoint;
-  lock.unlock(); // TODO this wasn't here before.  Make sure it's right to put it here
+  m_endpoint_mapper.registers(name, endpoint);
+  return RT_OK;
+}
+
+rtError
+rtRemoteMulticastResolver::deregisterObject(std::string const& name)
+{
+  // TODO
   return RT_OK;
 }
