@@ -5,11 +5,11 @@
 #include <stdint.h>
 #include "rtRemoteEndpointMapper.h"
 
-class rtRemoteLocalResolver : public rtRemoteIResolver
+class rtRemoteResolverLocal : public rtRemoteIResolver
 {
 public:
-  rtRemoteLocalResolver(rtRemoteEnvPtr env);
-  ~rtRemoteLocalResolver();
+  rtRemoteResolverLocal(rtRemoteEnvPtr env);
+  ~rtRemoteResolverLocal();
 
 public:
   virtual rtError open() override;

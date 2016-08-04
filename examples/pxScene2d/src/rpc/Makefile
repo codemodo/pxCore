@@ -28,7 +28,7 @@ RTRPC_SRCS=\
   rtRemote.cpp \
   rtRemoteConfig.cpp \
   rtRemoteFactory.cpp \
-  rtRemoteLocalResolver.cpp \
+  rtRemoteResolverLocal.cpp \
   rtRemoteMulticastResolver.cpp \
   rtRemoteUnicastResolver.cpp \
   rtRemoteNameService.cpp \

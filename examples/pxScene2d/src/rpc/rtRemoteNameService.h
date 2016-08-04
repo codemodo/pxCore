@@ -11,7 +11,7 @@
 
 #include "rtRemoteTypes.h"
 #include "rtSocketUtils.h"
-#include "rtRemoteLocalResolver.h"
+#include "rtRemoteResolverLocal.h"
 #include "rtRemoteEndpointMapper.h"
 
 class rtRemoteNameService
