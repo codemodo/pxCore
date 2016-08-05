@@ -71,29 +71,20 @@ rtRemoteEndpointMapperSimple::isRegistered(std::string const& objectId)
 rtRemoteEndpointMapperFile::rtRemoteEndpointMapperFile(rtRemoteEnvPtr env)
 : rtRemoteIEndpointMapper(env)
 {
-  std::string filePath = m_env->Config->resolver_file_db_path();
-  m_fp = fopen(filePath.c_str(), "r");
-  if (m_fp == nullptr)
-    throw rtErrorFromErrno(errno);
+  m_file_path = m_env->Config->resolver_file_db_path();
 }
 
 rtRemoteEndpointMapperFile::~rtRemoteEndpointMapperFile()
 {
-  if (m_fp)
-    fclose(m_fp);
-  m_fp = nullptr;
 }
 
 rtError
 rtRemoteEndpointMapperFile::registerEndpoint(std::string const& objectId, rtRemoteEndpointPtr const& endpoint)
 {
-  if (m_fp == nullptr)
-  {
-    std::string filePath = m_env->Config->resolver_file_db_path();
-    m_fp = fopen(filePath.c_str(), "r");
-    if (m_fp == nullptr)
-      return RT_FAIL;
-  }
+  FILE* fp;
+  fp = fopen(m_file_path.c_str(), "r");
+  if (fp == nullptr)
+    return RT_FAIL;
 
   // tmp file to write to while reading/checking contents of permanent file. renamed later.
   std::string path, tmpPath;
@@ -105,14 +96,14 @@ rtRemoteEndpointMapperFile::registerEndpoint(std::string const& objectId, rtRemo
   int read = -1;
 
   // lock it down
-  flock(fileno(m_fp), LOCK_EX);
+  flock(fileno(fp), LOCK_EX);
   
-  fseek(m_fp, 0, SEEK_SET);
+  fseek(fp, 0, SEEK_SET);
   while ( access( tmpPath.c_str(), F_OK ) != -1 );
   FILE *tmpFp = fopen(tmpPath.c_str(),"w");
 
   // read line by line
-  while ( (read = getline(&line, &len, m_fp)) != -1)
+  while ( (read = getline(&line, &len, fp)) != -1)
   {
     if (line[read-1] == '\n')
       line[read-1] = '\0';
@@ -142,10 +133,10 @@ rtRemoteEndpointMapperFile::registerEndpoint(std::string const& objectId, rtRemo
     rtLogError("failed to save file");
     return RT_FAIL;
   }
-  fflush(m_fp);
-  flock(fileno(m_fp), LOCK_UN);
-  if (m_fp)
-    fclose(m_fp);
+
+  flock(fileno(fp), LOCK_UN);
+  if (fp)
+    fclose(fp);
   return RT_OK;
 }
 
@@ -153,11 +144,11 @@ rtError
 rtRemoteEndpointMapperFile::deregisterEndpoint(std::string const& objectId)
 {
   rtError err = RT_OK;
-  if (m_fp == nullptr)
-  {
-    rtLogError("no database connection");
-    return RT_ERROR_INVALID_ARG;
-  }
+  
+  FILE* fp;
+  fp = fopen(m_file_path.c_str(), "r");
+  if (fp == nullptr)
+    return RT_FAIL;
 
   // tmp file to write to while reading/checking contents of permanent file. renamed later.
   std::string path, tmpPath;
@@ -169,14 +160,14 @@ rtRemoteEndpointMapperFile::deregisterEndpoint(std::string const& objectId)
   int read = -1;
 
   // lock it down
-  flock(fileno(m_fp), LOCK_EX);
+  flock(fileno(fp), LOCK_EX);
   
-  fseek(m_fp, 0, SEEK_SET);
+  fseek(fp, 0, SEEK_SET);
   while ( access( tmpPath.c_str(), F_OK ) != -1 );
   FILE *tmpFp = fopen(tmpPath.c_str(),"w");
 
   // read line by line
-  while ( (read = getline(&line, &len, m_fp)) != -1)
+  while ( (read = getline(&line, &len, fp)) != -1)
   {
     if (line[read-1] == '\n')
       line[read-1] = '\0';
@@ -198,7 +189,6 @@ rtRemoteEndpointMapperFile::deregisterEndpoint(std::string const& objectId)
     }
   }
   fclose(tmpFp);
-  fflush(m_fp);
   
   if (rename(tmpPath.c_str(), path.c_str()))
   {
@@ -206,7 +196,8 @@ rtRemoteEndpointMapperFile::deregisterEndpoint(std::string const& objectId)
     return RT_FAIL;
   }
     
-  flock(fileno(m_fp), LOCK_UN);
+  flock(fileno(fp), LOCK_UN);
+  fclose(fp);
 
   return err;
 }
@@ -214,13 +205,10 @@ rtRemoteEndpointMapperFile::deregisterEndpoint(std::string const& objectId)
 rtError
 rtRemoteEndpointMapperFile::lookupEndpoint(std::string const& objectId, rtRemoteEndpointPtr& endpoint)
 {
-  if (m_fp == nullptr)
-  {
-    std::string filePath = m_env->Config->resolver_file_db_path();
-    m_fp = fopen(filePath.c_str(), "r");
-    if (m_fp == nullptr)
-      return RT_FAIL;
-  }
+  FILE* fp;
+  fp = fopen(m_file_path.c_str(), "r");
+  if (fp == nullptr)
+    return RT_FAIL;
 
   std::string result;
   char *line = NULL;
@@ -228,10 +216,15 @@ rtRemoteEndpointMapperFile::lookupEndpoint(std::string const& objectId, rtRemote
   int read = -1;
 
   // lock it down
-  flock(fileno(m_fp), LOCK_EX);
+  flock(fileno(fp), LOCK_EX);
+  fseek(fp, 0, SEEK_SET);
 
+  std::string path, tmpPath;
+  path = m_env->Config->resolver_file_db_path();
+  tmpPath = path + ".tmp";
+  while ( access( tmpPath.c_str(), F_OK ) != -1 );
   // read line by line
-  while ( (read = getline(&line, &len, m_fp)) != -1)
+  while ( (read = getline(&line, &len, fp)) != -1)
   {
     if (line[read-1] == '\n')
       line[read-1] = '\0';
@@ -244,8 +237,8 @@ rtRemoteEndpointMapperFile::lookupEndpoint(std::string const& objectId, rtRemote
         result = lineString.substr(index+3, std::string::npos);
     }
   }
-  flock(fileno(m_fp), LOCK_UN);
-  
+  flock(fileno(fp), LOCK_UN);
+  fclose(fp);
   // result contains endpoint's URI (if registered)
   if (!result.empty())
     return m_env->Factory->createEndpoint(result, endpoint);

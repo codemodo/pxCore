@@ -50,7 +50,7 @@ public:
   virtual rtError lookupEndpoint(std::string const& objectId, rtRemoteEndpointPtr& endpoint) override; 
   virtual bool isRegistered(std::string const& objectId) override;
 private:
-  FILE* m_fp;
+  std::string m_file_path;
 };
 
 // class rtRemoteEndpointMapperDatabase : public rtRemoteIEndpointMapper
