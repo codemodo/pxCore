@@ -77,13 +77,22 @@ rtRemoteEndpointMapperFile::rtRemoteEndpointMapperFile(rtRemoteEnvPtr env)
     throw rtErrorFromErrno(errno);
 }
 
+rtRemoteEndpointMapperFile::~rtRemoteEndpointMapperFile()
+{
+  if (m_fp)
+    fclose(m_fp);
+  m_fp = nullptr;
+}
+
 rtError
 rtRemoteEndpointMapperFile::registerEndpoint(std::string const& objectId, rtRemoteEndpointPtr const& endpoint)
 {
   if (m_fp == nullptr)
   {
-    rtLogError("file not opened for registration");
-    return RT_ERROR_INVALID_ARG;
+    std::string filePath = m_env->Config->resolver_file_db_path();
+    m_fp = fopen(filePath.c_str(), "r");
+    if (m_fp == nullptr)
+      return RT_FAIL;
   }
 
   // tmp file to write to while reading/checking contents of permanent file. renamed later.
@@ -127,16 +136,16 @@ rtRemoteEndpointMapperFile::registerEndpoint(std::string const& objectId, rtRemo
   std::string result = objectId + "::=" + endpoint->toUriString();
   fprintf(tmpFp, "%s\n", result.c_str());
   fclose(tmpFp);
-  fflush(m_fp);
   
   if (rename(tmpPath.c_str(), path.c_str()))
   {
     rtLogError("failed to save file");
     return RT_FAIL;
   }
-
+  fflush(m_fp);
   flock(fileno(m_fp), LOCK_UN);
-
+  if (m_fp)
+    fclose(m_fp);
   return RT_OK;
 }
 
@@ -207,8 +216,10 @@ rtRemoteEndpointMapperFile::lookupEndpoint(std::string const& objectId, rtRemote
 {
   if (m_fp == nullptr)
   {
-    rtLogError("no database connection");
-    return RT_ERROR_INVALID_ARG;
+    std::string filePath = m_env->Config->resolver_file_db_path();
+    m_fp = fopen(filePath.c_str(), "r");
+    if (m_fp == nullptr)
+      return RT_FAIL;
   }
 
   std::string result;
@@ -218,8 +229,6 @@ rtRemoteEndpointMapperFile::lookupEndpoint(std::string const& objectId, rtRemote
 
   // lock it down
   flock(fileno(m_fp), LOCK_EX);
-  
-  fseek(m_fp, 0, SEEK_SET);
 
   // read line by line
   while ( (read = getline(&line, &len, m_fp)) != -1)
@@ -235,7 +244,6 @@ rtRemoteEndpointMapperFile::lookupEndpoint(std::string const& objectId, rtRemote
         result = lineString.substr(index+3, std::string::npos);
     }
   }
-  fflush(m_fp);
   flock(fileno(m_fp), LOCK_UN);
   
   // result contains endpoint's URI (if registered)

@@ -43,6 +43,7 @@ class rtRemoteEndpointMapperFile : public virtual rtRemoteIEndpointMapper
 {
 public:
   rtRemoteEndpointMapperFile(rtRemoteEnvPtr env);
+  ~rtRemoteEndpointMapperFile();
 public:
   virtual rtError registerEndpoint(std::string const& objectId, rtRemoteEndpointPtr const& endpoint) override;
   virtual rtError deregisterEndpoint(std::string const& objectId) override;

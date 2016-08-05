@@ -71,7 +71,7 @@ rtRemoteMulticastResolver::~rtRemoteMulticastResolver()
 rtError
 rtRemoteMulticastResolver::init()
 {
-  m_endpoint_mapper = new rtRemoteEndpointMapperSimple(m_env);
+  m_endpoint_mapper = new rtRemoteEndpointMapperFile(m_env);
   rtError err = RT_OK;
 
   uint16_t const port = m_env->Config->resolver_multicast_port();
@@ -531,11 +531,15 @@ rtRemoteMulticastResolver::close()
 rtError
 rtRemoteMulticastResolver::registerObject(std::string const& name, rtRemoteEndpointPtr endpoint)
 {
-  return m_endpoint_mapper->registerEndpoint(name, endpoint);
+  rtError e = m_endpoint_mapper->registerEndpoint(name, endpoint);
+  return e;
 }
 
 rtError
 rtRemoteMulticastResolver::deregisterObject(std::string const& name)
 {
-  return m_endpoint_mapper->deregisterEndpoint(name);
+  std::unique_lock<std::mutex> lock(m_mutex);
+  rtError e = m_endpoint_mapper->deregisterEndpoint(name);
+  lock.unlock();
+  return e;
 }
