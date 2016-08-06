@@ -33,9 +33,11 @@ RTRPC_SRCS=\
   rtRemoteUnicastResolver.cpp \
   rtRemoteNameService.cpp \
   rtRemoteConfigBuilder.cpp \
-  rtRemoteEndpoint.cpp \
   rtRemoteUtils.cpp \
-  rtRemoteEndpointMapper.cpp
+  rtRemoteMapperMap.cpp \
+  rtRemoteMapperFile.cpp \
+  rtRemoteMapperSql.cpp \
+  rtRemoteEndpointHandleStreamServer.cpp
 
 SAMPLEAPP_SRCS=\
   rpc_main.cpp

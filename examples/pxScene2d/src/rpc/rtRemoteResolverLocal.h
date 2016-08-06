@@ -3,7 +3,7 @@
 
 #include <string>
 #include <stdint.h>
-#include "rtRemoteEndpointMapper.h"
+#include "rtRemoteMapper.h"
 
 class rtRemoteResolverLocal : public rtRemoteIResolver
 {
@@ -21,5 +21,5 @@ public:
 
 private:
   rtRemoteEnvPtr m_env;
-  rtRemoteIEndpointMapper* m_endpoint_mapper;
+  rtRemoteIMapper* m_endpoint_mapper;
 };

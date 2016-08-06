@@ -3,9 +3,10 @@
 #include "rtRemoteIResolver.h"
 #include "rtRemoteMulticastResolver.h"
 #include "rtRemoteUnicastResolver.h"
+#include "rtRemoteResolverLocal.h"
 #include "rtRemoteTypes.h"
 #include "rtRemoteUtils.h"
-#include "rtRemoteResolverLocal.h"
+
 #include <algorithm>
 
 static rtResolverType

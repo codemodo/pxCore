@@ -5,7 +5,8 @@
 #include "rtRemoteTypes.h"
 #include "rtRemoteUtils.h"
 #include "rtRemoteEndpoint.h"
-#include "rtRemoteEndpointMapper.h"
+#include "rtRemoteMapper.h"
+#include "rtRemoteMapperFile.h"
 
 #include <memory>
 #include <condition_variable>
@@ -71,7 +72,7 @@ rtRemoteMulticastResolver::~rtRemoteMulticastResolver()
 rtError
 rtRemoteMulticastResolver::init()
 {
-  m_endpoint_mapper = new rtRemoteEndpointMapperFile(m_env);
+  m_endpoint_mapper = new rtRemoteMapperFile(m_env);
   rtError err = RT_OK;
 
   uint16_t const port = m_env->Config->resolver_multicast_port();

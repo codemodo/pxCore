@@ -16,6 +16,7 @@
 #include "rtRemoteIResolver.h"
 #include "rtSocketUtils.h"
 #include "rtRemoteEndpoint.h"
+#include "rtRemoteEndpointHandleStreamServer.h"
 
 class rtRemoteClient;
 
@@ -70,7 +71,7 @@ private:
   using ObjectRefeMap = std::map< std::string, ObjectReference >;
 
   rtRemoteEndpointPtr           m_endpoint;
-  rtRemoteStreamServerEndpoint* m_endpoint_server;
+  rtRemoteEndpointHandleStreamServer* m_endpoint_server;
 
   std::unique_ptr<std::thread>  m_thread;
   mutable std::mutex            m_mutex;

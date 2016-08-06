@@ -12,7 +12,7 @@
 #include "rtRemoteTypes.h"
 #include "rtSocketUtils.h"
 #include "rtRemoteResolverLocal.h"
-#include "rtRemoteEndpointMapper.h"
+#include "rtRemoteMapper.h"
 
 class rtRemoteNameService
 {
@@ -53,5 +53,5 @@ private:
   std::unique_ptr<std::thread> m_read_thread;
   int		                       m_shutdown_pipe[2];
   rtRemoteEnvPtr               m_env;
-  rtRemoteIEndpointMapper*     m_endpoint_mapper;
+  rtRemoteIMapper*     m_endpoint_mapper;
 };

@@ -8,6 +8,7 @@
 #include "rtValueWriter.h"
 #include "rtRemoteConfig.h"
 #include "rtRemoteFactory.h"
+#include "rtRemoteEndpointHandleStreamServer.h"
 
 #include <sstream>
 #include <set>
@@ -468,7 +469,7 @@ rtRemoteServer::openRpcListener()
   // create server handle
   if (m_endpoint_server)
     delete m_endpoint_server;
-  m_endpoint_server = new rtRemoteStreamServerEndpoint(m_endpoint);
+  m_endpoint_server = new rtRemoteEndpointHandleStreamServer(m_endpoint);
 
   // initialize endpoint socket
   e = m_endpoint_server->open();

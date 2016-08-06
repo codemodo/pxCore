@@ -5,7 +5,8 @@
 #include "rtRemoteTypes.h"
 #include "rtRemoteEndpoint.h"
 #include "rtRemoteUtils.h"
-#include "rtRemoteEndpointMapper.h"
+#include "rtRemoteMapper.h"
+#include "rtRemoteMapperFile.h"
 
 #include <condition_variable>
 #include <thread>
@@ -74,7 +75,7 @@ rtRemoteNameService::init()
 {
   rtError err = RT_OK;
 
-  m_endpoint_mapper = new rtRemoteEndpointMapperFile(m_env);
+  m_endpoint_mapper = new rtRemoteMapperFile(m_env);
 
   // get socket info ready
   uint16_t const nsport = m_env->Config->resolver_unicast_port();

@@ -4,14 +4,15 @@
 #include "rtRemoteTypes.h"
 #include <sys/socket.h>
 #include <string>
+#include <sstream>
 #include <stdint.h>
 
 /* Abstract base class for endpoint addresses */
 class rtRemoteIEndpoint
 {
 public:
-	rtRemoteIEndpoint(std::string const& scheme);
-	virtual ~rtRemoteIEndpoint();
+	rtRemoteIEndpoint(std::string const& scheme): m_scheme(scheme) { };
+	virtual ~rtRemoteIEndpoint() { };
 
 	virtual std::string toUriString() = 0;
 
@@ -22,6 +23,7 @@ protected:
 	std::string m_scheme;
 };
 
+
 /* Local endpoints.
  * Used to stored address information for unix domain sockets,
  * named pipes, files, shared memory, etc.
@@ -29,23 +31,35 @@ protected:
 class rtRemoteEndpointLocal : public virtual rtRemoteIEndpoint
 {
 public:
-	rtRemoteEndpointLocal(std::string const& scheme, std::string const& path);
+  rtRemoteEndpointLocal(std::string const& scheme, std::string const& path)
+  : rtRemoteIEndpoint(scheme)
+  , m_path(path)
+  { }
 	
-	virtual std::string toUriString() override;
-
-	bool isSocket() const;
-
-	inline std::string path() const
-	  { return m_path; }
+  virtual std::string toUriString() override
+  {
+    std::stringstream buff;
+    buff << m_scheme;
+    buff << "://";
+    buff << m_path;
+    return buff.str();
+  }
 	
-	inline bool operator==(rtRemoteEndpointLocal const& rhs) const
-	  { return m_path.compare(rhs.path()) == 0
-		      && m_scheme.compare(rhs.scheme()) == 0;
-		}
+  inline bool operator==(rtRemoteEndpointLocal const& rhs) const
+    { return m_path.compare(rhs.path()) == 0
+		  && m_scheme.compare(rhs.scheme()) == 0;
+	}
+
+  inline std::string path() const
+	{ return m_path; }
+
+  inline bool isSocket() const
+    { return m_scheme.compare("tcp") == 0 || m_scheme.compare("udp") == 0; }
 
 protected:
-	std::string m_path;
+  std::string m_path;
 };
+
 
 /* Remote endpoints.
  * Used to stored address information for remote sockets
@@ -54,26 +68,40 @@ protected:
 class rtRemoteEndpointRemote : public virtual rtRemoteIEndpoint
 {
 public:
-  rtRemoteEndpointRemote(std::string const& scheme, std::string const& host, int port);
+  rtRemoteEndpointRemote(std::string const& scheme, std::string const& host, int port)
+    : rtRemoteIEndpoint(scheme)
+    , m_host(host)
+    , m_port(port)
+  { }
 	
-	virtual std::string toUriString() override;
+  virtual std::string toUriString() override
+  {
+    std::stringstream buff;
+    buff << m_scheme;
+    buff << "://";
+    buff << m_host;
+    buff << ":";
+    buff << m_port;
+    return buff.str();
+  }
 
-	inline std::string host() const
-	  { return m_host; }
+  inline bool operator==(rtRemoteEndpointRemote const& rhs) const
+    { return m_host.compare(rhs.host()) == 0
+	      && m_port == rhs.port()
+          && m_scheme.compare(rhs.scheme()) == 0;
+	}
 
-	inline int port() const
-	  { return m_port; }
-	
-	inline bool operator==(rtRemoteEndpointRemote const& rhs) const
-	  { return m_host.compare(rhs.host()) == 0
-		      && m_port == rhs.port()
-		      && m_scheme.compare(rhs.scheme()) == 0;
-		}
+  inline std::string host() const
+	{ return m_host; }
+
+  inline int port() const
+    { return m_port; }
 
 protected:
-	std::string         m_host;
-	int                 m_port;
+  std::string         m_host;
+  int                 m_port;
 };
+
 
 /* Remote endpoints that include path information
  *
@@ -82,64 +110,32 @@ protected:
 class rtRemoteEndpointDistributed : public rtRemoteEndpointRemote, public rtRemoteEndpointLocal
 {
 public:
-	rtRemoteEndpointDistributed(std::string const& scheme, std::string const& host, int port, std::string const& path);
-	virtual std::string toUriString() override;
+  rtRemoteEndpointDistributed(std::string const& scheme, std::string const& host, int port, std::string const& path)
+    : rtRemoteIEndpoint(scheme)
+    , rtRemoteEndpointRemote(scheme, host, port)
+    , rtRemoteEndpointLocal(scheme, path)
+  { }
+	
+  virtual std::string toUriString() override
+  {
+    std::stringstream buff;
+    buff << m_scheme;
+    buff << "://";
+    buff << m_host;
+    buff << ":";
+    buff << m_port;
+    buff << m_path;
+    return buff.str();
+  }
+
+  inline bool operator==(rtRemoteEndpointDistributed const& rhs) const
+	{ return m_host.compare(rhs.host()) == 0
+		  && m_port == rhs.port()
+		  && m_path.compare(rhs.path()) == 0
+		  && m_scheme.compare(rhs.scheme()) == 0;
+    }
 };
 
-
-/////////////////////////
-// Endpoint handles                 
-/////////////////////////
-
-class rtRemoteIEndpointHandle
-{
-public:
-  virtual ~rtRemoteIEndpointHandle();
-
-  /* Should create fd */
-  virtual rtError open() = 0;
-	virtual rtError close() = 0;
-  
-  // inline rtRemoteIEndpoint address() const
-  //   { return *m_addr; }
-  
-  inline int fd() const
-    { return m_fd; }
-
-	inline void setFd(int fd)
-	  { m_fd = fd; }
-
-protected:
-  rtRemoteIEndpointHandle(rtRemoteEndpointPtr endpoint);
-  rtRemoteEndpointPtr m_addr;
-  int m_fd;
-};
-
-class rtRemoteIStreamEndpoint
-{
-	//TODO constructors and args for below methods
-  virtual rtError send(int fd) = 0;
-	virtual rtError receive(int fd) = 0;
-};
-
-class rtRemoteStreamServerEndpoint : public virtual rtRemoteIEndpointHandle, public rtRemoteIStreamEndpoint
-{
-public:
-  rtRemoteStreamServerEndpoint(rtRemoteEndpointPtr endpoint);
-  
-  virtual rtError open() override;
-	virtual rtError close() override;
-	virtual rtError send(int fd) override;
-	virtual rtError receive(int fd) override;
-	rtError doBind();
-	rtError doListen();
-	rtError doAccept(int& new_fd, rtRemoteEndpointPtr& remote_addr);
-
-	inline sockaddr_storage sockaddr() const
-	  { return m_socket; }
-
-	sockaddr_storage m_socket;
-};
 /*
 class rtRemoteStreamClientEndpoint : public virtual rtRemoteIEndpointHandle, public rtRemoteIStreamEndpoint
 {

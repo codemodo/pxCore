@@ -7,6 +7,7 @@
 #include "rtRemoteEndpoint.h"
 #include "rtRemoteUtils.h"
 #include <rtLog.h>
+#include "rtRemoteMapperFile.h"
 
 #include <errno.h>
 #include <string.h>
@@ -35,7 +36,7 @@ rtError
 rtRemoteResolverLocal::open()
 {
   //try catch TODO
-  m_endpoint_mapper = new rtRemoteEndpointMapperFile(m_env);
+  m_endpoint_mapper = new rtRemoteMapperFile(m_env);
   return RT_OK;
 }
 

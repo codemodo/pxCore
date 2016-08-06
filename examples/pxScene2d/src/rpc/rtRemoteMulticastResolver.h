@@ -13,7 +13,7 @@
 
 #include "rtRemoteTypes.h"
 #include "rtSocketUtils.h"
-#include "rtRemoteEndpointMapper.h"
+#include "rtRemoteMapper.h"
 
 
 class rtRemoteMulticastResolver : public rtRemoteIResolver
@@ -68,5 +68,5 @@ private:
   int		            m_shutdown_pipe[2];
   rtRemoteEnvPtr    m_env;
 
-  rtRemoteIEndpointMapper* m_endpoint_mapper;
+  rtRemoteIMapper* m_endpoint_mapper;
 };
