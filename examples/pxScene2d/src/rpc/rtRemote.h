@@ -59,11 +59,8 @@ rtError
 rtRemoteShutdown(rtRemoteEnvironment* env);
 
 /**
- * Use this when not running with a dedicated sub-system thread.
- * All incoming requests will execute on the thread calling this
- * function.  It will dispatch messages until the timout
- * is expired.  If the message queue is empty, it will return RT_ERROR_QUEUE_EMPTY
- * immediately.  Timeout duration is in milliseconds.
+ * Same as rtRemoteRunOnce, except that it will dispatch messages until the timout
+ * is expired. Timeout duration is in milliseconds.
  * @param timeout The amount of time to run this function. Use RT_REMOTE_TIMEOUT_INIFINITE
  * to run forever, or until another thread calls rtRemoteShutdown();
  */

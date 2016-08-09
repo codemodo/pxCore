@@ -133,7 +133,7 @@ rtRemoteLocateObject(rtRemoteEnvironment* env, char const* id, rtObjectRef& obj)
 }
 
 rtError
-rtRemoteRun(rtRemoteEnvironment* env, uint32_t delay)
+rtRemoteRun(rtRemoteEnvironment* env, uint32_t timeout)
 {
 
   if (env->Config->server_use_dispatch_thread())
@@ -141,18 +141,18 @@ rtRemoteRun(rtRemoteEnvironment* env, uint32_t delay)
 
   rtError e = RT_OK;
 
-  auto timeout = std::chrono::system_clock::now() + std::chrono::milliseconds(delay);
-  
-  // should pull at least one item off queue (even if initial timeout is zero)
+  auto time_remaining = std::chrono::milliseconds(timeout);
+
   do
   {
-    // auto start = std::chrono::steady_clock::now();
-    e = env->processSingleWorkItem();
+    auto start = std::chrono::steady_clock::now();
+    e = env->processSingleWorkItem(time_remaining, false, nullptr);
     if (e != RT_OK)
       return e;
     auto end = std::chrono::steady_clock::now();
-    // time_remaining -= std::chrono::milliseconds((end - start).count());
-  } while ((std::chrono::system_clock::now() < timeout) && (e == RT_OK));
+    time_remaining = std::chrono::milliseconds((end - start).count());
+  }
+  while ((time_remaining > std::chrono::milliseconds(0)) && (e == RT_OK));
 
   return e;
 }
@@ -205,17 +205,21 @@ rtRemoteEnvironment::waitForResponse(std::chrono::milliseconds timeout, rtRemote
 }
 
 rtError
-rtRemoteEnvironment::processSingleWorkItem(rtRemoteCorrelationKey* key, bool blocking, uint32_t delay)
+rtRemoteEnvironment::processSingleWorkItem(std::chrono::milliseconds timeout, bool wait, rtRemoteCorrelationKey* key)
 {
   rtError e = RT_ERROR_TIMEOUT;
-  
-  auto timeout = std::chrono::system_clock::now() + std::chrono::milliseconds(delay);
-  
+
   if (key)
     *key = kInvalidCorrelationKey;
-  
+
+  WorkItem workItem;
+  auto delay = std::chrono::system_clock::now() + timeout;
+
   std::unique_lock<std::mutex> lock(m_queue_mutex);
-  if (!m_queue_cond.wait_until(lock, timeout, [this, blocking] { return !blocking || !m_running || !this->m_queue.empty(); }))
+  if (!wait && m_queue.empty())
+    return RT_ERROR_QUEUE_EMPTY;
+
+  if (!m_queue_cond.wait_until(lock, delay, [this] { return !this->m_queue.empty() || !m_running; }))
   {
     e = RT_ERROR_TIMEOUT;
   }
@@ -223,53 +227,49 @@ rtRemoteEnvironment::processSingleWorkItem(rtRemoteCorrelationKey* key, bool blo
   {
     if (!m_running)
       return RT_OK;
-    
-    if (this->m_queue.empty())
+
+    if (!m_queue.empty())
     {
-      lock.unlock();
-      return RT_ERROR_QUEUE_EMPTY;
-    }
-    else
-    {
-      WorkItem workItem;
       workItem = m_queue.front();
       m_queue.pop();
-
-      if (workItem.Message)
-      {
-        rtRemoteMessageHandler messageHandler = nullptr;
-        void* argp = nullptr;
-
-        rtRemoteCorrelationKey const k = rtMessage_GetCorrelationKey(*workItem.Message);
-        auto itr = m_response_handlers.find(k);
-        if (itr != m_response_handlers.end())
-        {
-          messageHandler = itr->second.Func;
-          argp = itr->second.Arg;
-          m_response_handlers.erase(itr);
-        }
-        lock.unlock();
-      
-        if (messageHandler != nullptr)
-          e = messageHandler(workItem.Client, workItem.Message, argp);
-        else
-          e = Server->processMessage(workItem.Client, workItem.Message);
-
-        if (key)
-          *key = k;
-
-        if (Config->server_use_dispatch_thread())
-        {
-          std::unique_lock<std::mutex> lock(m_queue_mutex);
-          auto itr = m_waiters.find(k);
-          if (itr != m_waiters.end())
-            itr->second = ResponseState::Dispatched;
-          lock.unlock();
-          m_queue_cond.notify_all();
-        }
-      }
     }
   }
+
+  if (workItem.Message)
+  {
+    rtRemoteMessageHandler messageHandler = nullptr;
+    void* argp = nullptr;
+
+    rtRemoteCorrelationKey const k = rtMessage_GetCorrelationKey(*workItem.Message);
+    auto itr = m_response_handlers.find(k);
+    if (itr != m_response_handlers.end())
+    {
+      messageHandler = itr->second.Func;
+      argp = itr->second.Arg;
+      m_response_handlers.erase(itr);
+    }
+    lock.unlock();
+
+    if (messageHandler != nullptr)
+      e = messageHandler(workItem.Client, workItem.Message, argp);
+    else
+      e = Server->processMessage(workItem.Client, workItem.Message);
+
+    if (key)
+      *key = k;
+
+    if (Config->server_use_dispatch_thread())
+    {
+      std::unique_lock<std::mutex> lock(m_queue_mutex);
+      auto itr = m_waiters.find(k);
+      if (itr != m_waiters.end())
+        itr->second = ResponseState::Dispatched;
+      lock.unlock();
+      m_queue_cond.notify_all();
+    }
+  }
+
+  return e;
 }
 
 void
@@ -285,4 +285,3 @@ rtRemoteEnvironment::enqueueWorkItem(std::shared_ptr<rtRemoteClient> const& clnt
   lock.unlock();
   m_queue_cond.notify_all();
 }
-
