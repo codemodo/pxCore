@@ -1,12 +1,11 @@
-#include "rtRemote.h"
-#include "rtRemoteConfig.h"
-#include "rtRemoteNameService.h"
+#include <rtRemote.h>
 #include <rtObject.h>
+#include <rtValue.h>
 #include <functional>
 
 #include <unistd.h>
-#include <iostream>
-#include <map>
+
+//typedef void (*testFunction_t)();
 
 struct TestCase
 {
@@ -17,13 +16,13 @@ struct TestCase
   std::string server;
 };
 
-// Client function declarations
-void Test_Client_Set_Get_Bool();
-void Test_Client_Set_Get_Int8();
-void Test_Client_Set_Get_Uint8();
+// // Client function declarations
+// void Test_Client_Set_Get_Bool();
+// void Test_Client_Set_Get_Int8();
+// void Test_Client_Set_Get_Uint8();
 
-// Server function declarations
-void Test_Server_Set_Get_Generic();
+// // Server function declarations
+// void Test_Server_Set_Get_Generic();
 
 class rtTestObject : public rtObject
 {
